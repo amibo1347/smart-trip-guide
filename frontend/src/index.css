@@ -174,3 +174,24 @@ button.small { background: #eff6ff; color: var(--blue); padding: 6px 12px; font-
 .bycat { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .catchip { font-size: 0.75rem; background: #eff6ff; color: #1e40af; padding: 3px 8px; border-radius: 999px; }
 .card h3 { font-size: 1rem; margin: 0 0 10px; }
+
+/* ── 복기(Review) ── */
+.stat-grid { display: flex; gap: 10px; }
+.stat { flex: 1; text-align: center; background: #f8fafc; border: 1px solid var(--border); border-radius: 10px; padding: 12px 6px; }
+.stat-v { font-size: 1.3rem; font-weight: 700; color: var(--blue); }
+.stat-l { font-size: 0.78rem; color: var(--muted); margin-top: 2px; }
+.budget { display: flex; flex-direction: column; gap: 6px; }
+.brow { display: flex; justify-content: space-between; align-items: center; font-size: 0.9rem; }
+.brow .good { color: #166534; }
+.brow .bad { color: #b91c1c; }
+.bar { height: 10px; background: #e2e8f0; border-radius: 999px; overflow: hidden; margin: 10px 0; }
+.bar-fill { height: 100%; background: linear-gradient(90deg, #60a5fa, #2563eb); }
+.map { height: 280px; border-radius: 10px; overflow: hidden; z-index: 0; }
+.chk { display: inline-flex; align-items: center; gap: 4px; font-size: 0.8rem; color: var(--muted); white-space: nowrap; }
+.actual-row { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; }
+.stars { display: inline-flex; }
+.star { background: none; padding: 0 1px; font-size: 1.05rem; color: #cbd5e1; line-height: 1; }
+.star.on { color: #f59e0b; }
+.cost-in { width: 90px; padding: 4px 6px; margin: 0 3px; border: 1px solid var(--border); border-radius: 6px; }
+.ta { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 9px; font-family: inherit; font-size: 0.95rem; resize: vertical; margin-bottom: 10px; }
+.saved { color: #166534; font-size: 0.85rem; margin-left: 10px; }

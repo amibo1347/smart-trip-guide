@@ -48,6 +48,10 @@ export const api = {
   recordExpense: (tripId, payload) => request('POST', `/api/trips/${tripId}/expenses`, payload),
   listExpenses: (tripId) => request('GET', `/api/trips/${tripId}/expenses`),
   expenseSummary: (tripId) => request('GET', `/api/trips/${tripId}/expenses/summary`),
+  // Review (여행 후 복기)
+  getReview: (tripId) => request('GET', `/api/trips/${tripId}/review`),
+  upsertActual: (itemId, payload) => request('PUT', `/api/plan-items/${itemId}/actual`, payload),
+  saveFeedback: (tripId, payload) => request('PUT', `/api/trips/${tripId}/feedback`, payload),
   // 오프라인 큐 재전송용 일반 POST
   post: (path, body) => request('POST', path, body),
 }
