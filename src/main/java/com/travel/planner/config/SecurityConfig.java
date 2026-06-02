@@ -11,6 +11,8 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
+import org.springframework.security.web.context.SecurityContextRepository;
 
 /**
  * 보안 설정.
@@ -25,17 +27,25 @@ import org.springframework.security.web.SecurityFilterChain;
 @EnableWebSecurity
 public class SecurityConfig {
 
+    /** 세션 기반 로그인 컨텍스트 저장소(로컬 로그인 + 소셜 로그인 공용). */
+    @Bean
+    public SecurityContextRepository securityContextRepository() {
+        return new HttpSessionSecurityContextRepository();
+    }
+
     @Bean
     public SecurityFilterChain securityFilterChain(
             HttpSecurity http,
             ObjectProvider<ClientRegistrationRepository> clientRegistrationRepository,
             CustomOAuth2UserService customOAuth2UserService,
-            OAuth2LoginSuccessHandler successHandler) throws Exception {
+            OAuth2LoginSuccessHandler successHandler,
+            SecurityContextRepository securityContextRepository) throws Exception {
 
         http
                 // JSON API + 세션 쿠키. CSRF는 1차에서 비활성(추후 필요 시 /api 한정 토큰 적용).
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
+                .securityContext(c -> c.securityContextRepository(securityContextRepository))
                 .authorizeHttpRequests(auth -> auth.anyRequest().permitAll())
                 .logout(logout -> logout
                         .logoutUrl("/logout")

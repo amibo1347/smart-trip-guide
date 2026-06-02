@@ -5,7 +5,6 @@ import TripDetail from './TripDetail.jsx'
 export default function App() {
   const [health, setHealth] = useState('확인 중...')
   const [user, setUser] = useState(null)
-  const [social, setSocial] = useState(false) // 소셜 세션으로 로그인됐는지
   const [trips, setTrips] = useState([])
   const [error, setError] = useState('')
   const [selectedTrip, setSelectedTrip] = useState(null)
@@ -17,16 +16,20 @@ export default function App() {
       .catch(() => setHealth('백엔드 연결 실패 — 8082 기동 확인'))
   }, [])
 
-  // 소셜 로그인 세션 확인 (있으면 자동 로그인 상태로)
+  // 세션 로그인 상태 확인 (로컬/소셜 공통)
   useEffect(() => {
     api.me()
-      .then((s) => { if (s.authenticated) { setUser(s.user); setSocial(true); refreshTrips(s.user.id) } })
+      .then((s) => { if (s.authenticated) { setUser(s.user); refreshTrips(s.user.id) } })
       .catch(() => {})
   }, [])
 
+  function onLoggedIn(u) {
+    setUser(u); setError(''); refreshTrips(u.id)
+  }
+
   async function logout() {
     try { await api.logout() } catch { /* noop */ }
-    setUser(null); setSocial(false); setTrips([]); setSelectedTrip(null)
+    setUser(null); setTrips([]); setSelectedTrip(null)
   }
 
   async function refreshTrips(userId) {
@@ -50,13 +53,9 @@ export default function App() {
         <TripDetail trip={selectedTrip} onBack={() => setSelectedTrip(null)} onError={setError} />
       ) : (
         <>
-          <UserSection
-            user={user}
-            social={social}
-            onCreated={(u) => { setUser(u); setError(''); refreshTrips(u.id) }}
-            onLogout={logout}
-            onError={setError}
-          />
+          {user
+            ? <UserBadge user={user} onLogout={logout} />
+            : <AuthSection onLoggedIn={onLoggedIn} onError={setError} />}
 
           {user && (
             <TripSection
@@ -73,15 +72,55 @@ export default function App() {
   )
 }
 
-function UserSection({ user, social, onCreated, onLogout, onError }) {
-  const [form, setForm] = useState({ email: '', password: '', nickname: '' })
+function UserBadge({ user, onLogout }) {
+  return (
+    <section className="card">
+      <div className="badge-row">
+        <p className="who">
+          <b>{user.nickname}</b> ({user.email}) · <span className="prov">{user.provider}</span>
+        </p>
+        <button className="small" onClick={onLogout}>로그아웃</button>
+      </div>
+    </section>
+  )
+}
+
+function AuthSection({ onLoggedIn, onError }) {
+  const [mode, setMode] = useState('login') // 'login' | 'signup'
+
+  return (
+    <section className="card">
+      <h2>{mode === 'login' ? '로그인' : '회원가입'}</h2>
+
+      {mode === 'login'
+        ? <LoginForm onLoggedIn={onLoggedIn} onError={onError} />
+        : <SignupForm onLoggedIn={onLoggedIn} onError={onError} />}
+
+      <p className="switch">
+        {mode === 'login'
+          ? <>계정이 없으신가요? <button className="link" onClick={() => setMode('signup')}>회원가입</button></>
+          : <>이미 계정이 있으신가요? <button className="link" onClick={() => setMode('login')}>로그인</button></>}
+      </p>
+
+      <div className="divider"><span>소셜 계정으로 로그인</span></div>
+      <div className="social">
+        <a className="sbtn google" href={socialLoginUrl('google')}><span>G</span> Google로 계속하기</a>
+        <a className="sbtn kakao" href={socialLoginUrl('kakao')}><span>K</span> 카카오로 계속하기</a>
+      </div>
+    </section>
+  )
+}
+
+function LoginForm({ onLoggedIn, onError }) {
+  const [form, setForm] = useState({ email: '', password: '' })
   const [busy, setBusy] = useState(false)
 
   async function submit(e) {
     e.preventDefault()
     setBusy(true)
     try {
-      onCreated(await api.createUser(form))
+      const s = await api.login(form)
+      onLoggedIn(s.user)
     } catch (err) {
       onError(err.message)
     } finally {
@@ -89,44 +128,53 @@ function UserSection({ user, social, onCreated, onLogout, onError }) {
     }
   }
 
-  if (user) {
-    return (
-      <section className="card">
-        <h2>① 사용자</h2>
-        <p className="who">
-          <b>{user.nickname}</b> ({user.email}) · <span className="prov">{user.provider}</span>
-        </p>
-        {social && <button className="small" onClick={onLogout}>로그아웃</button>}
-      </section>
-    )
+  return (
+    <form onSubmit={submit}>
+      <input type="email" placeholder="이메일 (아이디)" value={form.email}
+             onChange={(e) => setForm({ ...form, email: e.target.value })} required />
+      <input type="password" placeholder="비밀번호" value={form.password}
+             onChange={(e) => setForm({ ...form, password: e.target.value })} required />
+      <button disabled={busy}>{busy ? '로그인 중...' : '로그인'}</button>
+    </form>
+  )
+}
+
+function SignupForm({ onLoggedIn, onError }) {
+  const empty = { email: '', password: '', password2: '', nickname: '' }
+  const [form, setForm] = useState(empty)
+  const [busy, setBusy] = useState(false)
+
+  async function submit(e) {
+    e.preventDefault()
+    if (form.password !== form.password2) {
+      onError('비밀번호가 일치하지 않습니다.')
+      return
+    }
+    setBusy(true)
+    try {
+      await api.createUser({ email: form.email, password: form.password, nickname: form.nickname })
+      // 가입 직후 자동 로그인(세션 발급)
+      const s = await api.login({ email: form.email, password: form.password })
+      onLoggedIn(s.user)
+    } catch (err) {
+      onError(err.message)
+    } finally {
+      setBusy(false)
+    }
   }
 
   return (
-    <section className="card">
-      <h2>① 로그인 / 회원가입</h2>
-
-      <div className="social">
-        <a className="sbtn google" href={socialLoginUrl('google')}>
-          <span>G</span> Google로 계속하기
-        </a>
-        <a className="sbtn kakao" href={socialLoginUrl('kakao')}>
-          <span>K</span> 카카오로 계속하기
-        </a>
-      </div>
-      <p className="muted small-text">소셜 로그인은 서버에 자격증명이 설정된 경우 동작합니다.</p>
-
-      <div className="divider"><span>또는 이메일로 가입</span></div>
-
-      <form onSubmit={submit}>
-        <input placeholder="이메일" type="email" value={form.email}
-               onChange={(e) => setForm({ ...form, email: e.target.value })} required />
-        <input placeholder="비밀번호 (8자 이상)" type="password" value={form.password}
-               onChange={(e) => setForm({ ...form, password: e.target.value })} required />
-        <input placeholder="닉네임" value={form.nickname}
-               onChange={(e) => setForm({ ...form, nickname: e.target.value })} required />
-        <button disabled={busy}>{busy ? '처리 중...' : '가입하기'}</button>
-      </form>
-    </section>
+    <form onSubmit={submit}>
+      <input type="email" placeholder="이메일 (아이디)" value={form.email}
+             onChange={(e) => setForm({ ...form, email: e.target.value })} required />
+      <input type="password" placeholder="비밀번호 (8자 이상)" value={form.password}
+             onChange={(e) => setForm({ ...form, password: e.target.value })} required />
+      <input type="password" placeholder="비밀번호 재입력" value={form.password2}
+             onChange={(e) => setForm({ ...form, password2: e.target.value })} required />
+      <input placeholder="닉네임" value={form.nickname}
+             onChange={(e) => setForm({ ...form, nickname: e.target.value })} required />
+      <button disabled={busy}>{busy ? '가입 중...' : '가입하기'}</button>
+    </form>
   )
 }
 

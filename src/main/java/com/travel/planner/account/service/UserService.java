@@ -6,6 +6,7 @@ import com.travel.planner.account.entity.AuthProvider;
 import com.travel.planner.account.entity.User;
 import com.travel.planner.account.repository.UserRepository;
 import com.travel.planner.common.exception.DuplicateResourceException;
+import com.travel.planner.common.exception.InvalidCredentialsException;
 import com.travel.planner.common.exception.NotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -36,6 +37,21 @@ public class UserService {
 
     public UserResponse get(Long id) {
         return UserResponse.from(getEntity(id));
+    }
+
+    /**
+     * 로컬(이메일/비밀번호) 로그인 검증. 성공 시 사용자 반환, 실패 시 401.
+     */
+    public User authenticateLocal(String email, String rawPassword) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new InvalidCredentialsException("이메일 또는 비밀번호가 올바르지 않습니다."));
+        if (user.getProvider() != AuthProvider.LOCAL || user.getPasswordHash() == null) {
+            throw new InvalidCredentialsException(user.getProvider() + " 소셜 로그인으로 가입된 계정입니다. 소셜 버튼으로 로그인하세요.");
+        }
+        if (!passwordEncoder.matches(rawPassword, user.getPasswordHash())) {
+            throw new InvalidCredentialsException("이메일 또는 비밀번호가 올바르지 않습니다.");
+        }
+        return user;
     }
 
     public UserResponse getByEmail(String email) {

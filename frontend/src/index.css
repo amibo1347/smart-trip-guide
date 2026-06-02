@@ -91,9 +91,12 @@ button:disabled { opacity: 0.6; cursor: progress; }
   font-size: 0.9rem;
 }
 
-.who { color: var(--muted); margin: 0 0 10px; }
+.who { color: var(--muted); margin: 0; }
 .prov { font-size: 0.7rem; background: #f1f5f9; padding: 2px 8px; border-radius: 999px; }
 .muted { color: var(--muted); }
+.badge-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.switch { text-align: center; font-size: 0.85rem; color: var(--muted); margin: 12px 0 0; }
+.switch .link { font-size: 0.85rem; }
 
 /* ── 소셜 로그인 ── */
 .social { display: flex; flex-direction: column; gap: 8px; }

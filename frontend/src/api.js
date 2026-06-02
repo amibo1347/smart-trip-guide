@@ -36,6 +36,7 @@ export const api = {
   deleteAccommodation: (id) => request('DELETE', `/api/accommodations/${id}`),
   // Auth
   me: () => request('GET', '/api/auth/me'),
+  login: (payload) => request('POST', '/api/auth/login', payload),
   logout: () => request('POST', '/logout'),
   // Tracking (여행 중 기록)
   recordLocation: (tripId, payload) => request('POST', `/api/trips/${tripId}/locations`, payload),
