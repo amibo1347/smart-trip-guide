@@ -21,6 +21,8 @@ dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
 	implementation 'org.springframework.boot:spring-boot-starter-validation'
 	implementation 'org.springframework.boot:spring-boot-starter-web'
+	// BCrypt 비밀번호 해싱만 사용(시큐리티 필터체인 미적용). 추후 인증 도입 시 starter-security로 확장.
+	implementation 'org.springframework.security:spring-security-crypto'
 	implementation 'org.flywaydb:flyway-core'
 	implementation 'org.flywaydb:flyway-mysql'
 	compileOnly 'org.projectlombok:lombok'
