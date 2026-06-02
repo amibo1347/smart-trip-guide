@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { api, socialLoginUrl } from './api.js'
+import { api, socialLoginUrl, setUnauthorizedHandler } from './api.js'
 import TripDetail from './TripDetail.jsx'
 
 export default function App() {
@@ -14,6 +14,11 @@ export default function App() {
     api.health()
       .then((d) => setHealth(`${d.status} (${d.service})`))
       .catch(() => setHealth('백엔드 연결 실패 — 8082 기동 확인'))
+  }, [])
+
+  // 401(세션 만료/미인증) → 로그인 화면으로 전환
+  useEffect(() => {
+    setUnauthorizedHandler(() => { setUser(null); setTrips([]); setSelectedTrip(null) })
   }, [])
 
   // 세션 로그인 상태 확인 (로컬/소셜 공통)

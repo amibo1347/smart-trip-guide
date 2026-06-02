@@ -1,6 +1,10 @@
 // API 호출 래퍼. dev에서는 vite 프록시(/api → 8082), prod에서는 동일 출처 또는 VITE_API_BASE 사용.
 const BASE = import.meta.env.VITE_API_BASE ?? ''
 
+// 401(미인증) 발생 시 호출될 전역 핸들러 — App이 로그인 화면으로 전환하도록 등록.
+let unauthorizedHandler = null
+export function setUnauthorizedHandler(fn) { unauthorizedHandler = fn }
+
 async function request(method, path, body) {
   const res = await fetch(BASE + path, {
     method,
@@ -11,6 +15,10 @@ async function request(method, path, body) {
   const text = await res.text()
   const data = text ? JSON.parse(text) : null
   if (!res.ok) {
+    // 미인증이면 전역 핸들러로 로그인 화면 전환 (단, 로그인 시도 자체는 제외)
+    if (res.status === 401 && path !== '/api/auth/login' && unauthorizedHandler) {
+      unauthorizedHandler()
+    }
     // 백엔드 표준 에러 응답(ErrorResponse) 형태를 메시지로 변환
     const msg = data?.message ?? `요청 실패 (HTTP ${res.status})`
     const fields = data?.fieldErrors
