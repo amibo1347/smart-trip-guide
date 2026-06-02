@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api } from './api.js'
+import Bookings from './Bookings.jsx'
 
 const TYPE_LABEL = {
   SPOT: '🏞 명소',
@@ -37,6 +38,7 @@ export default function Itinerary({ trip, onError }) {
     <div>
       <AiGenerate trip={trip} plan={plan} onGenerated={setPlan} onError={onError} />
       <BookingHelper trip={trip} plan={plan} onError={onError} />
+      <Bookings trip={trip} onError={onError} />
 
       {!plan && <p className="muted">일정 불러오는 중...</p>}
 
