@@ -37,3 +37,37 @@ dependencies {
 tasks.named('test') {
 	useJUnitPlatform()
 }
+
+// ===== 프론트엔드(React PWA) 통합 빌드 =====
+// frontend/ 를 빌드해 Spring 정적 리소스로 번들 → 백엔드(8082) 한 곳에서 화면까지 서빙.
+def frontendDir = file("$projectDir/frontend")
+def isWindows = System.getProperty('os.name').toLowerCase(Locale.ROOT).contains('win')
+def npmCmd = isWindows ? ['cmd', '/c', 'npm'] : ['npm']
+
+tasks.register('frontendInstall', Exec) {
+	workingDir frontendDir
+	inputs.file("$frontendDir/package.json")
+	outputs.dir("$frontendDir/node_modules")
+	commandLine(npmCmd + ['install'])
+}
+
+tasks.register('frontendBuild', Exec) {
+	dependsOn 'frontendInstall'
+	workingDir frontendDir
+	inputs.dir("$frontendDir/src")
+	inputs.file("$frontendDir/index.html")
+	inputs.file("$frontendDir/vite.config.js")
+	outputs.dir("$frontendDir/dist")
+	commandLine(npmCmd + ['run', 'build'])
+}
+
+tasks.register('copyFrontend', Copy) {
+	dependsOn 'frontendBuild'
+	from "$frontendDir/dist"
+	into "$projectDir/src/main/resources/static"
+}
+
+// 백엔드 리소스 처리 전에 프론트 빌드 산출물을 static 으로 복사
+tasks.named('processResources') {
+	dependsOn 'copyFrontend'
+}
