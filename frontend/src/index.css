@@ -91,8 +91,28 @@ button:disabled { opacity: 0.6; cursor: progress; }
   font-size: 0.9rem;
 }
 
-.who { color: var(--muted); margin: 0; }
+.who { color: var(--muted); margin: 0 0 10px; }
+.prov { font-size: 0.7rem; background: #f1f5f9; padding: 2px 8px; border-radius: 999px; }
 .muted { color: var(--muted); }
+
+/* ── 소셜 로그인 ── */
+.social { display: flex; flex-direction: column; gap: 8px; }
+.sbtn {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 11px; border-radius: 9px; font-weight: 600; font-size: 0.95rem;
+  text-decoration: none; border: 1px solid var(--border);
+}
+.sbtn span {
+  width: 22px; height: 22px; border-radius: 50%; display: inline-flex;
+  align-items: center; justify-content: center; font-weight: 800; font-size: 0.8rem;
+}
+.sbtn.google { background: #fff; color: #1f2937; }
+.sbtn.google span { background: #fff; color: #ea4335; border: 1px solid #e2e8f0; }
+.sbtn.kakao { background: #fee500; color: #191600; }
+.sbtn.kakao span { background: #191600; color: #fee500; }
+.divider { text-align: center; margin: 16px 0 12px; position: relative; color: var(--muted); font-size: 0.8rem; }
+.divider::before { content: ''; position: absolute; top: 50%; left: 0; right: 0; height: 1px; background: var(--border); }
+.divider span { background: var(--card); padding: 0 10px; position: relative; }
 
 .trips { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 10px; }
 .trips li { border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; }

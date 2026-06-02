@@ -30,9 +30,12 @@ export default defineConfig({
   ],
   server: {
     port: 5173,
-    // dev 중 /api 호출을 백엔드(8082)로 프록시 → CORS 없이 동작
+    // dev 중 /api·OAuth 경로를 백엔드(8082)로 프록시 → CORS 없이 동작
     proxy: {
-      '/api': { target: BACKEND, changeOrigin: true }
+      '/api': { target: BACKEND, changeOrigin: true },
+      '/oauth2': { target: BACKEND, changeOrigin: true },
+      '/login': { target: BACKEND, changeOrigin: true },
+      '/logout': { target: BACKEND, changeOrigin: true }
     }
   }
 })

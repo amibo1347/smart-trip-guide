@@ -6,6 +6,7 @@ async function request(method, path, body) {
     method,
     headers: body ? { 'Content-Type': 'application/json' } : undefined,
     body: body ? JSON.stringify(body) : undefined,
+    credentials: 'include', // 세션 쿠키 포함 (소셜 로그인 상태 유지)
   })
   const text = await res.text()
   const data = text ? JSON.parse(text) : null
@@ -29,4 +30,12 @@ export const api = {
   getPlan: (tripId) => request('GET', `/api/trips/${tripId}/plan`),
   addPlanItem: (dayId, payload) => request('POST', `/api/plan-days/${dayId}/items`, payload),
   deletePlanItem: (itemId) => request('DELETE', `/api/plan-items/${itemId}`),
+  // Auth
+  me: () => request('GET', '/api/auth/me'),
+  logout: () => request('POST', '/logout'),
+}
+
+// 소셜 로그인 시작 (백엔드 OAuth2 인가 엔드포인트로 전체 페이지 이동)
+export function socialLoginUrl(provider) {
+  return (BASE || '') + `/oauth2/authorization/${provider}`
 }

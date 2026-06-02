@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
-import { api } from './api.js'
+import { api, socialLoginUrl } from './api.js'
 import Itinerary from './Itinerary.jsx'
 
 export default function App() {
   const [health, setHealth] = useState('확인 중...')
   const [user, setUser] = useState(null)
+  const [social, setSocial] = useState(false) // 소셜 세션으로 로그인됐는지
   const [trips, setTrips] = useState([])
   const [error, setError] = useState('')
   const [selectedTrip, setSelectedTrip] = useState(null)
@@ -15,6 +16,18 @@ export default function App() {
       .then((d) => setHealth(`${d.status} (${d.service})`))
       .catch(() => setHealth('백엔드 연결 실패 — 8082 기동 확인'))
   }, [])
+
+  // 소셜 로그인 세션 확인 (있으면 자동 로그인 상태로)
+  useEffect(() => {
+    api.me()
+      .then((s) => { if (s.authenticated) { setUser(s.user); setSocial(true); refreshTrips(s.user.id) } })
+      .catch(() => {})
+  }, [])
+
+  async function logout() {
+    try { await api.logout() } catch { /* noop */ }
+    setUser(null); setSocial(false); setTrips([]); setSelectedTrip(null)
+  }
 
   async function refreshTrips(userId) {
     try {
@@ -37,7 +50,13 @@ export default function App() {
         <Itinerary trip={selectedTrip} onBack={() => setSelectedTrip(null)} onError={setError} />
       ) : (
         <>
-          <UserSection user={user} onCreated={(u) => { setUser(u); setError(''); refreshTrips(u.id) }} onError={setError} />
+          <UserSection
+            user={user}
+            social={social}
+            onCreated={(u) => { setUser(u); setError(''); refreshTrips(u.id) }}
+            onLogout={logout}
+            onError={setError}
+          />
 
           {user && (
             <TripSection
@@ -54,7 +73,7 @@ export default function App() {
   )
 }
 
-function UserSection({ user, onCreated, onError }) {
+function UserSection({ user, social, onCreated, onLogout, onError }) {
   const [form, setForm] = useState({ email: '', password: '', nickname: '' })
   const [busy, setBusy] = useState(false)
 
@@ -74,14 +93,30 @@ function UserSection({ user, onCreated, onError }) {
     return (
       <section className="card">
         <h2>① 사용자</h2>
-        <p className="who">현재 사용자: <b>{user.nickname}</b> ({user.email}) · id={user.id}</p>
+        <p className="who">
+          <b>{user.nickname}</b> ({user.email}) · <span className="prov">{user.provider}</span>
+        </p>
+        {social && <button className="small" onClick={onLogout}>로그아웃</button>}
       </section>
     )
   }
 
   return (
     <section className="card">
-      <h2>① 회원가입</h2>
+      <h2>① 로그인 / 회원가입</h2>
+
+      <div className="social">
+        <a className="sbtn google" href={socialLoginUrl('google')}>
+          <span>G</span> Google로 계속하기
+        </a>
+        <a className="sbtn kakao" href={socialLoginUrl('kakao')}>
+          <span>K</span> 카카오로 계속하기
+        </a>
+      </div>
+      <p className="muted small-text">소셜 로그인은 서버에 자격증명이 설정된 경우 동작합니다.</p>
+
+      <div className="divider"><span>또는 이메일로 가입</span></div>
+
       <form onSubmit={submit}>
         <input placeholder="이메일" type="email" value={form.email}
                onChange={(e) => setForm({ ...form, email: e.target.value })} required />
