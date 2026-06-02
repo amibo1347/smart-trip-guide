@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react'
 import { api } from './api.js'
+import Itinerary from './Itinerary.jsx'
 
 export default function App() {
   const [health, setHealth] = useState('확인 중...')
   const [user, setUser] = useState(null)
   const [trips, setTrips] = useState([])
   const [error, setError] = useState('')
+  const [selectedTrip, setSelectedTrip] = useState(null)
 
   // 헬스체크
   useEffect(() => {
@@ -31,15 +33,22 @@ export default function App() {
 
       {error && <div className="error" onClick={() => setError('')}>⚠ {error} (클릭하여 닫기)</div>}
 
-      <UserSection user={user} onCreated={(u) => { setUser(u); setError(''); refreshTrips(u.id) }} onError={setError} />
+      {selectedTrip ? (
+        <Itinerary trip={selectedTrip} onBack={() => setSelectedTrip(null)} onError={setError} />
+      ) : (
+        <>
+          <UserSection user={user} onCreated={(u) => { setUser(u); setError(''); refreshTrips(u.id) }} onError={setError} />
 
-      {user && (
-        <TripSection
-          user={user}
-          trips={trips}
-          onCreated={() => refreshTrips(user.id)}
-          onError={setError}
-        />
+          {user && (
+            <TripSection
+              user={user}
+              trips={trips}
+              onCreated={() => refreshTrips(user.id)}
+              onOpen={setSelectedTrip}
+              onError={setError}
+            />
+          )}
+        </>
       )}
     </div>
   )
@@ -86,7 +95,7 @@ function UserSection({ user, onCreated, onError }) {
   )
 }
 
-function TripSection({ user, trips, onCreated, onError }) {
+function TripSection({ user, trips, onCreated, onOpen, onError }) {
   const empty = { title: '', startDate: '', endDate: '', headcount: 1, budgetLimit: '', concept: '' }
   const [form, setForm] = useState(empty)
   const [busy, setBusy] = useState(false)
@@ -143,7 +152,8 @@ function TripSection({ user, trips, onCreated, onError }) {
         {trips.length === 0 && <p className="muted">아직 여행이 없습니다. 위에서 추가해 보세요.</p>}
         <ul className="trips">
           {trips.map((t) => (
-            <li key={t.id}>
+            <li key={t.id} className="clickable" onClick={() => onOpen(t)}
+                title="클릭하여 일정 편집">
               <div className="trip-head">
                 <b>{t.title}</b>
                 <span className={`status ${t.status}`}>{t.status}</span>
@@ -153,6 +163,7 @@ function TripSection({ user, trips, onCreated, onError }) {
                 {t.budgetLimit != null && <> · 💰 {Number(t.budgetLimit).toLocaleString()}원</>}
                 {t.concept && <> · 🏷 {t.concept}</>}
               </div>
+              <div className="trip-cta">일정 편집 →</div>
             </li>
           ))}
         </ul>

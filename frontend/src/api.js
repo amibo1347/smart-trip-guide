@@ -25,4 +25,8 @@ export const api = {
   createUser: (payload) => request('POST', '/api/users', payload),
   createTrip: (payload) => request('POST', '/api/trips', payload),
   listTrips: (userId) => request('GET', `/api/trips?userId=${userId}`),
+  // Planning
+  getPlan: (tripId) => request('GET', `/api/trips/${tripId}/plan`),
+  addPlanItem: (dayId, payload) => request('POST', `/api/plan-days/${dayId}/items`, payload),
+  deletePlanItem: (itemId) => request('DELETE', `/api/plan-items/${itemId}`),
 }
