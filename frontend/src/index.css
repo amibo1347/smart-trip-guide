@@ -1,0 +1,105 @@
+:root {
+  --blue: #2563eb;
+  --bg: #f1f5f9;
+  --card: #ffffff;
+  --text: #0f172a;
+  --muted: #64748b;
+  --border: #e2e8f0;
+  font-family: system-ui, -apple-system, 'Segoe UI', 'Malgun Gothic', sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.app {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 16px 16px 48px;
+}
+
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 8px 0 16px;
+}
+
+header h1 { font-size: 1.4rem; margin: 0; }
+
+.badge {
+  font-size: 0.75rem;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #e2e8f0;
+  color: var(--muted);
+}
+.badge.ok { background: #dcfce7; color: #166534; }
+.badge.bad { background: #fee2e2; color: #991b1b; }
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 16px 18px;
+  margin-bottom: 14px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.card h2 { font-size: 1.05rem; margin: 0 0 12px; }
+
+form { display: flex; flex-direction: column; gap: 10px; }
+
+input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  font-size: 0.95rem;
+}
+input:focus { outline: 2px solid var(--blue); border-color: var(--blue); }
+
+.row { display: flex; gap: 10px; }
+.row label { flex: 1; font-size: 0.8rem; color: var(--muted); display: flex; flex-direction: column; gap: 4px; }
+
+button {
+  background: var(--blue);
+  color: white;
+  border: none;
+  padding: 11px;
+  border-radius: 9px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+button:disabled { opacity: 0.6; cursor: progress; }
+
+.error {
+  background: #fef2f2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
+  border-radius: 9px;
+  padding: 10px 12px;
+  margin-bottom: 14px;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.who { color: var(--muted); margin: 0; }
+.muted { color: var(--muted); }
+
+.trips { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 10px; }
+.trips li { border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; }
+.trip-head { display: flex; justify-content: space-between; align-items: center; }
+.trip-meta { color: var(--muted); font-size: 0.85rem; margin-top: 6px; }
+
+.status { font-size: 0.7rem; padding: 3px 8px; border-radius: 999px; background: #e2e8f0; color: var(--muted); }
+.status.PLANNED { background: #dbeafe; color: #1e40af; }
+.status.ONGOING { background: #fef9c3; color: #854d0e; }
+.status.DONE { background: #dcfce7; color: #166534; }
