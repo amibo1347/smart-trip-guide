@@ -1,19 +1,9 @@
-# =====================================================================
-# 소셜 로그인(OAuth2) 설정 — 'oauth' 프로필에서만 로드된다.
-# 활성화: 환경변수에 자격증명을 채우고  SPRING_PROFILES_ACTIVE=oauth  로 실행.
-# 이 프로필이 꺼져 있으면 ClientRegistration이 없어 소셜 로그인은 비활성(앱은 정상 동작).
-# =====================================================================
+# Kakao 로그인 — 'kakao' 프로필에서만 로드. Kakao는 표준 OIDC가 아니라 엔드포인트 직접 지정.
 spring:
   security:
     oauth2:
       client:
         registration:
-          google:
-            client-id: ${GOOGLE_CLIENT_ID}
-            client-secret: ${GOOGLE_CLIENT_SECRET}
-            scope:
-              - email
-              - profile
           kakao:
             client-id: ${KAKAO_CLIENT_ID}          # 카카오 REST API 키
             client-secret: ${KAKAO_CLIENT_SECRET}
@@ -24,7 +14,6 @@ spring:
               - account_email
               - profile_nickname
             client-name: Kakao
-        # Kakao는 표준 OIDC 제공자가 아니라 엔드포인트를 직접 지정해야 한다.
         provider:
           kakao:
             authorization-uri: https://kauth.kakao.com/oauth/authorize
