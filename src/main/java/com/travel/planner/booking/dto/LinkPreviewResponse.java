@@ -1,11 +1,18 @@
 package com.travel.planner.booking.dto;
 
-/** 링크 미리보기(Open Graph). 가격은 사이트별로 불확실하여 포함하지 않음(사용자 확인 입력). */
+import java.math.BigDecimal;
+
+/**
+ * 링크 미리보기(Open Graph + 구조화 데이터).
+ * price 는 사이트가 메타/JSON-LD로 '실제 노출한 값'만 채움(없으면 null, 환각 없음).
+ */
 public record LinkPreviewResponse(
         String url,
         String title,
         String imageUrl,
         String description,
-        String siteName
+        String siteName,
+        BigDecimal price,
+        String currency
 ) {
 }

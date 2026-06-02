@@ -54,7 +54,11 @@ export default function Bookings({ trip, onError }) {
 }
 
 function ImportForm({ trip, onSaved, onError }) {
-  const empty = { url: '', type: 'HOTEL', title: '', price: '', startDate: '', endDate: '', memo: '', imageUrl: null }
+  // 날짜는 여행 기간으로 미리 채움(스크래핑 없이 정확). 사용자가 수정 가능.
+  const empty = {
+    url: '', type: 'HOTEL', title: '', price: '',
+    startDate: trip.startDate || '', endDate: trip.endDate || '', memo: '', imageUrl: null,
+  }
   const [form, setForm] = useState(empty)
   const [preview, setPreview] = useState(null)
   const [busy, setBusy] = useState(false)
@@ -65,7 +69,12 @@ function ImportForm({ trip, onSaved, onError }) {
     try {
       const p = await api.linkPreview(form.url)
       setPreview(p)
-      setForm((f) => ({ ...f, title: f.title || p.title || '', imageUrl: p.imageUrl || null }))
+      setForm((f) => ({
+        ...f,
+        title: f.title || p.title || '',
+        imageUrl: p.imageUrl || null,
+        price: (f.price === '' && p.price != null) ? String(p.price) : f.price, // 사이트가 노출한 가격이 있으면 채움
+      }))
     } catch (e) {
       onError(e.message) // 실패해도 수동 입력으로 저장 가능
     } finally {
@@ -105,7 +114,10 @@ function ImportForm({ trip, onSaved, onError }) {
       {preview && (
         <div className="preview">
           {preview.imageUrl && <img className="bk-img" src={preview.imageUrl} alt="" referrerPolicy="no-referrer" />}
-          <div className="muted small-text">{preview.siteName || '미리보기'} · {preview.title}</div>
+          <div className="muted small-text">
+            {preview.siteName || '미리보기'} · {preview.title}
+            <br />{preview.price != null ? `💰 가격 자동 감지: ${Number(preview.price).toLocaleString()}원 (확인 후 저장)` : '※ 이 사이트는 가격을 자동으로 못 읽어요 — 본 값을 직접 입력하세요.'}
+          </div>
         </div>
       )}
 
