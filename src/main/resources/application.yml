@@ -1,9 +1,14 @@
+server:
+  # 8080/8081이 로컬 타 프로세스에 점유되어 8082 사용. 운영은 SERVER_PORT로 오버라이드.
+  port: ${SERVER_PORT:8082}
+
 spring:
   application:
     name: smart-travel-planner
 
   datasource:
-    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:smart_travel}?serverTimezone=Asia/Seoul&characterEncoding=UTF-8&useSSL=false&allowPublicKeyRetrieval=true
+    # 로컬 기본값은 docker-compose MySQL(호스트 3308). 운영은 DB_* 환경변수로 오버라이드.
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3308}/${DB_NAME:smart_travel}?serverTimezone=Asia/Seoul&characterEncoding=UTF-8&useSSL=false&allowPublicKeyRetrieval=true
     username: ${DB_USER:root}
     password: ${DB_PASSWORD:root}
     driver-class-name: com.mysql.cj.jdbc.Driver

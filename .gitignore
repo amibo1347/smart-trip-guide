@@ -40,3 +40,6 @@ out/
 .env
 *.local.yml
 application-local.yml
+
+### Local run artifacts ###
+bootrun.log
