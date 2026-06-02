@@ -202,4 +202,15 @@ button.small { background: #eff6ff; color: var(--blue); padding: 6px 12px; font-
 .ai-head h3 { margin: 0; }
 .ver { font-size: 0.72rem; color: #6d28d9; background: #ede9fe; padding: 3px 8px; border-radius: 999px; }
 .ai-card input { margin-bottom: 8px; }
-.ai-card button { background: linear-gradient(135deg, #7c3aed, #2563eb); }
+.ai-card select { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 9px; font-size: 0.95rem; }
+.ai-card .chk { margin: 6px 0 10px; }
+.ai-card button { background: linear-gradient(135deg, #7c3aed, #2563eb); width: 100%; }
+
+/* ── 예약 도우미 ── */
+.link-group { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 8px 0; }
+.lg-title { font-size: 0.85rem; font-weight: 600; color: var(--muted); width: 100%; }
+.lk { display: inline-block; padding: 8px 12px; border: 1px solid var(--border); border-radius: 9px;
+  background: #fff; color: var(--text); text-decoration: none; font-size: 0.88rem; font-weight: 600; }
+.lk:hover { border-color: var(--blue); color: var(--blue); }
+.maplink { color: var(--blue); text-decoration: none; font-size: 0.8rem; white-space: nowrap; }
+.maplink:hover { text-decoration: underline; }

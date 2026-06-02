@@ -4,10 +4,12 @@ import com.travel.planner.account.security.CurrentUser;
 import com.travel.planner.planning.dto.AccommodationRequest;
 import com.travel.planner.planning.dto.AccommodationResponse;
 import com.travel.planner.planning.dto.AddPlanItemRequest;
+import com.travel.planner.planning.dto.BookingLinksResponse;
 import com.travel.planner.planning.dto.GeneratePlanRequest;
 import com.travel.planner.planning.dto.PlanResponse;
 import com.travel.planner.planning.service.AccommodationService;
 import com.travel.planner.planning.service.AiPlanService;
+import com.travel.planner.planning.service.BookingLinkService;
 import com.travel.planner.planning.service.PlanService;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -31,6 +33,7 @@ public class PlanController {
     private final PlanService planService;
     private final AccommodationService accommodationService;
     private final AiPlanService aiPlanService;
+    private final BookingLinkService bookingLinkService;
     private final CurrentUser currentUser;
 
     /** 여행의 현재 일정 (없으면 자동 생성). */
@@ -44,8 +47,17 @@ public class PlanController {
     public PlanResponse generatePlan(@PathVariable Long tripId,
                                      @Valid @RequestBody(required = false) GeneratePlanRequest request,
                                      Authentication auth) {
-        String note = request == null ? null : request.note();
-        return aiPlanService.generate(tripId, currentUser.requireId(auth), note);
+        GeneratePlanRequest req = (request == null)
+                ? new GeneratePlanRequest(null, null, null, null) : request;
+        return aiPlanService.generate(tripId, currentUser.requireId(auth), req);
+    }
+
+    /** 항공/숙소 예약 핸드오프 딥링크. */
+    @GetMapping("/api/trips/{tripId}/booking-links")
+    public BookingLinksResponse bookingLinks(@PathVariable Long tripId,
+                                             @RequestParam(required = false) String origin,
+                                             Authentication auth) {
+        return bookingLinkService.build(tripId, currentUser.requireId(auth), origin);
     }
 
     /** 특정 일자에 일정 항목 추가. */

@@ -36,6 +36,7 @@ export default function Itinerary({ trip, onError }) {
   return (
     <div>
       <AiGenerate trip={trip} plan={plan} onGenerated={setPlan} onError={onError} />
+      <BookingHelper trip={trip} plan={plan} onError={onError} />
 
       {!plan && <p className="muted">일정 불러오는 중...</p>}
 
@@ -66,7 +67,10 @@ export default function Itinerary({ trip, onError }) {
                     <>⏰ {fmt(it.plannedStart)}{it.plannedEnd ? `~${fmt(it.plannedEnd)}` : ''} </>
                   )}
                   {it.estCost != null && <>💰 {Number(it.estCost).toLocaleString()}원 </>}
-                  {it.place?.address && <>📍 {it.place.address}</>}
+                  {it.place?.address && <>📍 {it.place.address} </>}
+                  {(it.type === 'SPOT' || it.type === 'MEAL' || it.type === 'ACTIVITY') && (
+                    <a className="maplink" href={mapUrl(it)} target="_blank" rel="noreferrer">🗺 지도</a>
+                  )}
                 </div>
               </li>
             ))}
@@ -109,14 +113,19 @@ export default function Itinerary({ trip, onError }) {
 }
 
 function AiGenerate({ trip, plan, onGenerated, onError }) {
-  const [note, setNote] = useState('')
+  const [form, setForm] = useState({ note: '', origin: '서울', flightTime: 'ANY', lowCost: false })
   const [busy, setBusy] = useState(false)
 
   async function generate() {
     if (!window.confirm('AI가 새 일정 버전을 생성합니다. 기존 일정은 이전 버전으로 보관됩니다. 진행할까요?')) return
     setBusy(true)
     try {
-      onGenerated(await api.generatePlan(trip.id, { note: note || null }))
+      onGenerated(await api.generatePlan(trip.id, {
+        note: form.note || null,
+        origin: form.origin || null,
+        flightTime: form.flightTime,
+        lowCost: form.lowCost,
+      }))
     } catch (e) {
       onError(e.message)
     } finally {
@@ -130,13 +139,89 @@ function AiGenerate({ trip, plan, onGenerated, onError }) {
         <h3>✨ AI 일정 생성</h3>
         {plan && <span className="ver">v{plan.version} · {plan.generatedBy === 'AI' ? 'AI 생성' : '직접 작성'}</span>}
       </div>
-      <input placeholder="지역·요청사항 (예: 제주 동부 위주, 맛집 많이)" value={note}
-             onChange={(e) => setNote(e.target.value)} disabled={busy} />
+      <input placeholder="지역·요청사항 (예: 도톤보리 맛집 위주)" value={form.note}
+             onChange={(e) => setForm({ ...form, note: e.target.value })} disabled={busy} />
+      <div className="row">
+        <label style={{ flex: 1 }}>출발지
+          <input value={form.origin} placeholder="서울"
+                 onChange={(e) => setForm({ ...form, origin: e.target.value })} disabled={busy} />
+        </label>
+        <label style={{ flex: 1 }}>항공 시간대
+          <select value={form.flightTime} onChange={(e) => setForm({ ...form, flightTime: e.target.value })} disabled={busy}>
+            <option value="ANY">상관없음</option>
+            <option value="MORNING">오전</option>
+            <option value="AFTERNOON">낮</option>
+            <option value="EVENING">저녁</option>
+          </select>
+        </label>
+      </div>
+      <label className="chk">
+        <input type="checkbox" checked={form.lowCost}
+               onChange={(e) => setForm({ ...form, lowCost: e.target.checked })} disabled={busy} /> 저가항공(LCC) 선호
+      </label>
       <button onClick={generate} disabled={busy}>
         {busy ? '생성 중... (수 초 소요)' : '✨ AI로 일정 만들기'}
       </button>
     </section>
   )
+}
+
+function BookingHelper({ trip, plan, onError }) {
+  const [data, setData] = useState(null)
+  const [open, setOpen] = useState(false)
+
+  async function load() {
+    try { setData(await api.bookingLinks(trip.id)) } catch (e) { onError(e.message) }
+  }
+
+  function toggle() {
+    const next = !open
+    setOpen(next)
+    if (next && !data) load()
+  }
+
+  return (
+    <section className="card">
+      <div className="day-head">
+        <h3>🧳 예약 도우미 (항공·숙소)</h3>
+        <button className="small" onClick={toggle}>{open ? '닫기' : '열기'}</button>
+      </div>
+      {open && (
+        <>
+          <p className="muted small-text">
+            실제 빈좌석·가격·예약은 아래 사이트에서 확인하세요. (목적지: {data?.destination ?? plan?.destinationCity ?? trip.title})
+          </p>
+          {!data && <p className="muted small-text">불러오는 중...</p>}
+          {data && (
+            <>
+              <div className="link-group">
+                <span className="lg-title">✈️ 항공권</span>
+                {data.flights.map((l) => (
+                  <a key={l.label} className="lk" href={l.url} target="_blank" rel="noreferrer">
+                    {l.label}{l.prefilled ? ' 🔎' : ' ↗'}
+                  </a>
+                ))}
+              </div>
+              <div className="link-group">
+                <span className="lg-title">🏨 숙소 ({trip.headcount}인)</span>
+                {data.hotels.map((l) => (
+                  <a key={l.label} className="lk" href={l.url} target="_blank" rel="noreferrer">
+                    {l.label}{l.prefilled ? ' 🔎' : ' ↗'}
+                  </a>
+                ))}
+              </div>
+              <p className="muted small-text">🔎=검색 미리채움 · ↗=사이트 이동. 고른 숙소는 아래 ‘🏨 숙박’에 추가하세요.</p>
+            </>
+          )}
+        </>
+      )}
+    </section>
+  )
+}
+
+function mapUrl(item) {
+  const q = item.place?.name || item.title
+  return 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(q)
 }
 
 function fmt(t) { return t ? t.slice(0, 5) : '' }

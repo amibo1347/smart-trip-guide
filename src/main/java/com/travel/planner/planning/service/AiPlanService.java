@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.travel.planner.common.exception.AiException;
 import com.travel.planner.planning.ai.GeminiClient;
+import com.travel.planner.planning.dto.GeneratePlanRequest;
 import com.travel.planner.planning.dto.PlanResponse;
 import com.travel.planner.planning.entity.GeneratedBy;
 import com.travel.planner.planning.entity.Place;
@@ -42,33 +43,38 @@ public class AiPlanService {
     private final PlaceRepository placeRepository;
     private final ObjectMapper objectMapper;
 
-    /** Gemini 응답 스키마: [{ dayNo, items:[{type,title,plannedStart,plannedEnd,estCost,placeName,address}] }] */
+    private static final Map<String, Object> ITEM_SCHEMA = Map.of(
+            "type", "OBJECT",
+            "properties", new LinkedHashMap<>(Map.of(
+                    "type", Map.of("type", "STRING", "enum",
+                            List.of("SPOT", "MEAL", "MOVE", "STAY", "ACTIVITY")),
+                    "title", Map.of("type", "STRING"),
+                    "plannedStart", Map.of("type", "STRING"),
+                    "plannedEnd", Map.of("type", "STRING"),
+                    "estCost", Map.of("type", "NUMBER"),
+                    "placeName", Map.of("type", "STRING"),
+                    "address", Map.of("type", "STRING"))),
+            "required", List.of("type", "title"));
+
+    /** Gemini 응답 스키마: { destinationCity, days:[{ dayNo, items:[...] }] } */
     private static final Map<String, Object> SCHEMA = Map.of(
-            "type", "ARRAY",
-            "items", Map.of(
-                    "type", "OBJECT",
-                    "properties", Map.of(
-                            "dayNo", Map.of("type", "INTEGER"),
-                            "items", Map.of("type", "ARRAY", "items", Map.of(
-                                    "type", "OBJECT",
-                                    "properties", new LinkedHashMap<>(Map.of(
-                                            "type", Map.of("type", "STRING", "enum",
-                                                    List.of("SPOT", "MEAL", "MOVE", "STAY", "ACTIVITY")),
-                                            "title", Map.of("type", "STRING"),
-                                            "plannedStart", Map.of("type", "STRING"),
-                                            "plannedEnd", Map.of("type", "STRING"),
-                                            "estCost", Map.of("type", "NUMBER"),
-                                            "placeName", Map.of("type", "STRING"),
-                                            "address", Map.of("type", "STRING"))),
-                                    "required", List.of("type", "title")))),
-                    "required", List.of("dayNo", "items")));
+            "type", "OBJECT",
+            "properties", new LinkedHashMap<>(Map.of(
+                    "destinationCity", Map.of("type", "STRING"),
+                    "days", Map.of("type", "ARRAY", "items", Map.of(
+                            "type", "OBJECT",
+                            "properties", Map.of(
+                                    "dayNo", Map.of("type", "INTEGER"),
+                                    "items", Map.of("type", "ARRAY", "items", ITEM_SCHEMA)),
+                            "required", List.of("dayNo", "items"))))),
+            "required", List.of("destinationCity", "days"));
 
     @Transactional
-    public PlanResponse generate(Long tripId, Long userId, String note) {
+    public PlanResponse generate(Long tripId, Long userId, GeneratePlanRequest req) {
         Trip trip = tripService.getOwnedTrip(tripId, userId);
         long days = ChronoUnit.DAYS.between(trip.getStartDate(), trip.getEndDate()) + 1;
 
-        String prompt = buildPrompt(trip, days, note);
+        String prompt = buildPrompt(trip, days, req);
         String json = gemini.generateJson(prompt, SCHEMA);
 
         JsonNode root;
@@ -86,7 +92,8 @@ public class AiPlanService {
                 .version(version)
                 .generatedBy(GeneratedBy.AI)
                 .aiModel(gemini.model())
-                .promptSnapshot(snapshot(trip, note))
+                .destinationCity(text(root, "destinationCity"))
+                .promptSnapshot(snapshot(trip, req))
                 .build();
 
         // 여행 기간만큼 일자 생성(서버가 신뢰 가능한 날짜로 고정)
@@ -100,8 +107,9 @@ public class AiPlanService {
         }
 
         // AI 항목을 해당 일자에 부착 (일자 범위를 벗어난 dayNo는 무시 — 서버 재검증)
-        if (root.isArray()) {
-            for (JsonNode dayNode : root) {
+        JsonNode daysNode = root.path("days");
+        if (daysNode.isArray()) {
+            for (JsonNode dayNode : daysNode) {
                 int no = dayNode.path("dayNo").asInt(0);
                 PlanDay day = dayByNo.get(no);
                 if (day == null) {
@@ -142,35 +150,50 @@ public class AiPlanService {
                 .build();
     }
 
-    private String buildPrompt(Trip trip, long days, String note) {
+    private String buildPrompt(Trip trip, long days, GeneratePlanRequest req) {
+        String origin = (req.origin() == null || req.origin().isBlank()) ? "서울" : req.origin();
+        String flightPref = switch (req.flightTime() == null ? "" : req.flightTime().toUpperCase()) {
+            case "MORNING" -> "오전 출발 선호";
+            case "AFTERNOON" -> "낮 출발 선호";
+            case "EVENING" -> "저녁 출발 선호";
+            default -> "시간대 무관";
+        };
+        String lowCost = Boolean.TRUE.equals(req.lowCost()) ? "저가항공(LCC) 선호" : "항공사 무관";
+        String note = (req.note() == null || req.note().isBlank()) ? "없음" : req.note();
+
         return """
-                너는 한국어 여행 일정 플래너야. 아래 조건으로 현실적인 여행 일정을 만들어줘.
+                너는 한국인 대상 여행 일정 플래너야. 아래 조건으로 현실적이고 '구체적인' 일정을 짜줘.
+                - 출발지: %s
                 - 제목/목적지: %s
                 - 기간: %s ~ %s (총 %d일)
                 - 인원: %d명
-                - 예산 한도: %s
+                - 전체 예산 한도: %s (이 안에 항공+숙박+현지비용이 모두 들어가야 함)
                 - 컨셉: %s
+                - 항공 선호: %s, %s
                 - 추가 요청: %s
 
-                규칙:
-                - dayNo 는 1부터 %d 까지. 각 일자에 3~6개 항목.
-                - type 은 SPOT(명소)/MEAL(식사)/MOVE(이동)/STAY(숙박)/ACTIVITY 중 하나.
-                - plannedStart/plannedEnd 는 "HH:mm" 24시간 형식.
-                - estCost 는 1인 기준 원화 정수(추정). 모르면 0.
-                - placeName/address 는 실제 존재할 법한 장소/주소(한국어).
-                - 예산 한도를 의식해서 합리적으로 배분.
+                매우 중요한 규칙:
+                - destinationCity 에는 목적지 '도시명'만 한국어로 (예: "오사카", "부산").
+                - MEAL(식사)/SPOT(명소)/ACTIVITY 는 '실제 존재하는 구체적 상호명'을 title 에 넣어라.
+                  나쁜 예: "점심 식사" / 좋은 예: "이치란 라멘 도톤보리점에서 점심".
+                  placeName 에는 그 장소의 정확한 상호명, address 에는 대략 위치(동/구/거리)를 넣어라.
+                - 항공권과 숙소는 '실시간 예약'이 필요하므로 일정 항목으로 비용을 지어내지 마라.
+                  비행 이동(공항↔도심)은 MOVE 로 넣되 estCost 는 0. 숙소 체크인/아웃 정도만 STAY 로 표시(estCost 0).
+                - 현지 활동/식비(MEAL/SPOT/ACTIVITY)의 estCost 만 1인 기준 원화 정수로 추정. 모르면 0.
+                  항공+숙박을 제외하고도 전체 예산을 넘지 않도록 현지 비용을 보수적으로 잡아라.
+                - dayNo 는 1부터 %d 까지. 각 일자 4~6개 항목, plannedStart/End 는 "HH:mm".
                 지정된 JSON 스키마로만 응답해.
                 """.formatted(
-                trip.getTitle(),
+                origin, trip.getTitle(),
                 trip.getStartDate(), trip.getEndDate(), days,
                 trip.getHeadcount(),
                 trip.getBudgetLimit() == null ? "미설정" : trip.getBudgetLimit().toPlainString() + "원",
                 trip.getConcept() == null ? "특별히 없음" : trip.getConcept(),
-                (note == null || note.isBlank()) ? "없음" : note,
+                flightPref, lowCost, note,
                 days);
     }
 
-    private String snapshot(Trip trip, String note) {
+    private String snapshot(Trip trip, GeneratePlanRequest req) {
         try {
             Map<String, Object> snap = new LinkedHashMap<>();
             snap.put("title", trip.getTitle());
@@ -179,7 +202,10 @@ public class AiPlanService {
             snap.put("headcount", trip.getHeadcount());
             snap.put("budgetLimit", trip.getBudgetLimit());
             snap.put("concept", trip.getConcept());
-            snap.put("note", note);
+            snap.put("origin", req.origin());
+            snap.put("flightTime", req.flightTime());
+            snap.put("lowCost", req.lowCost());
+            snap.put("note", req.note());
             snap.put("model", gemini.model());
             return objectMapper.writeValueAsString(snap);
         } catch (Exception e) {

@@ -9,11 +9,12 @@ public record PlanResponse(
         Long tripId,
         int version,
         GeneratedBy generatedBy,
+        String destinationCity,
         List<PlanDayResponse> days
 ) {
     public static PlanResponse from(Plan p) {
         return new PlanResponse(
-                p.getId(), p.getTripId(), p.getVersion(), p.getGeneratedBy(),
+                p.getId(), p.getTripId(), p.getVersion(), p.getGeneratedBy(), p.getDestinationCity(),
                 p.getDays().stream().map(PlanDayResponse::from).toList());
     }
 }

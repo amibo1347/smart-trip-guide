@@ -31,6 +31,7 @@ export const api = {
   // Planning
   getPlan: (tripId) => request('GET', `/api/trips/${tripId}/plan`),
   generatePlan: (tripId, payload) => request('POST', `/api/trips/${tripId}/plan/generate`, payload),
+  bookingLinks: (tripId, origin) => request('GET', `/api/trips/${tripId}/booking-links${origin ? `?origin=${encodeURIComponent(origin)}` : ''}`),
   addPlanItem: (dayId, payload) => request('POST', `/api/plan-days/${dayId}/items`, payload),
   deletePlanItem: (itemId) => request('DELETE', `/api/plan-items/${itemId}`),
   movePlanItem: (itemId, direction) => request('PATCH', `/api/plan-items/${itemId}/move?direction=${direction}`),

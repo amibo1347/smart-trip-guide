@@ -45,6 +45,9 @@ public class Plan extends BaseEntity {
     @Column(name = "ai_model", length = 50)
     private String aiModel;
 
+    @Column(name = "destination_city", length = 100)
+    private String destinationCity;
+
     @Column(name = "prompt_snapshot", columnDefinition = "json")
     private String promptSnapshot;
 
@@ -53,11 +56,13 @@ public class Plan extends BaseEntity {
     private List<PlanDay> days = new ArrayList<>();
 
     @Builder
-    private Plan(Long tripId, Integer version, GeneratedBy generatedBy, String aiModel, String promptSnapshot) {
+    private Plan(Long tripId, Integer version, GeneratedBy generatedBy, String aiModel,
+                 String destinationCity, String promptSnapshot) {
         this.tripId = tripId;
         this.version = version;
         this.generatedBy = generatedBy == null ? GeneratedBy.USER : generatedBy;
         this.aiModel = aiModel;
+        this.destinationCity = destinationCity;
         this.promptSnapshot = promptSnapshot;
     }
 
