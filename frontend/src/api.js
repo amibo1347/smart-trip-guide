@@ -16,7 +16,9 @@ async function request(method, path, body) {
     const fields = data?.fieldErrors
       ? ' — ' + Object.entries(data.fieldErrors).map(([k, v]) => `${k}: ${v}`).join(', ')
       : ''
-    throw new Error(msg + fields)
+    const err = new Error(msg + fields)
+    err.status = res.status // 401/403 등 호출측에서 분기용
+    throw err
   }
   return data
 }
@@ -25,7 +27,7 @@ export const api = {
   health: () => request('GET', '/api/health'),
   createUser: (payload) => request('POST', '/api/users', payload),
   createTrip: (payload) => request('POST', '/api/trips', payload),
-  listTrips: (userId) => request('GET', `/api/trips?userId=${userId}`),
+  listTrips: () => request('GET', '/api/trips'), // 세션 사용자의 여행
   // Planning
   getPlan: (tripId) => request('GET', `/api/trips/${tripId}/plan`),
   addPlanItem: (dayId, payload) => request('POST', `/api/plan-days/${dayId}/items`, payload),

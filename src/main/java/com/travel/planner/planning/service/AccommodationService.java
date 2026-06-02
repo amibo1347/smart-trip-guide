@@ -24,8 +24,8 @@ public class AccommodationService {
     private final TripService tripService;
 
     @Transactional
-    public AccommodationResponse add(Long tripId, AccommodationRequest request) {
-        tripService.getEntity(tripId); // 존재 검증
+    public AccommodationResponse add(Long tripId, AccommodationRequest request, Long userId) {
+        tripService.getOwnedTrip(tripId, userId); // 소유권 검증
 
         Place place = null;
         if (request.address() != null && !request.address().isBlank()) {
@@ -47,16 +47,18 @@ public class AccommodationService {
         return AccommodationResponse.from(accommodationRepository.save(acc));
     }
 
-    public List<AccommodationResponse> list(Long tripId) {
+    public List<AccommodationResponse> list(Long tripId, Long userId) {
+        tripService.getOwnedTrip(tripId, userId);
         return accommodationRepository.findByTripIdOrderByCheckInAsc(tripId).stream()
                 .map(AccommodationResponse::from)
                 .toList();
     }
 
     @Transactional
-    public void delete(Long accommodationId) {
+    public void delete(Long accommodationId, Long userId) {
         Accommodation acc = accommodationRepository.findById(accommodationId)
                 .orElseThrow(() -> new NotFoundException("숙박을 찾을 수 없습니다: " + accommodationId));
+        tripService.getOwnedTrip(acc.getTripId(), userId);
         accommodationRepository.delete(acc);
     }
 }

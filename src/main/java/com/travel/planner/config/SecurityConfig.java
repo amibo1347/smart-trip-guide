@@ -6,13 +6,17 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.security.web.context.SecurityContextRepository;
+import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
 
 /**
  * 보안 설정.
@@ -46,7 +50,18 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
                 .securityContext(c -> c.securityContextRepository(securityContextRepository))
-                .authorizeHttpRequests(auth -> auth.anyRequest().permitAll())
+                .authorizeHttpRequests(auth -> auth
+                        // 공개 API: 헬스/로그인 상태/로그인/회원가입
+                        .requestMatchers("/api/health", "/api/auth/me", "/api/auth/login").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/users").permitAll()
+                        // 그 외 모든 /api/** 는 로그인 필요
+                        .requestMatchers("/api/**").authenticated()
+                        // 정적 리소스, /, /oauth2/**, /login/**, /logout 등은 공개
+                        .anyRequest().permitAll())
+                // 미인증 /api 요청은 리다이렉트 대신 401 (JSON 클라이언트용)
+                .exceptionHandling(e -> e.defaultAuthenticationEntryPointFor(
+                        new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED),
+                        new AntPathRequestMatcher("/api/**")))
                 .logout(logout -> logout
                         .logoutUrl("/logout")
                         .logoutSuccessHandler((req, res, a) -> res.setStatus(HttpServletResponse.SC_OK)));

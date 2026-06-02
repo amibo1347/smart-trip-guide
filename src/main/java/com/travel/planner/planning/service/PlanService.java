@@ -38,8 +38,8 @@ public class PlanService {
      * 여행의 현재 일정 조회. 없으면 v1(USER)을 만들고 여행 기간만큼 일자를 자동 생성한다.
      */
     @Transactional
-    public PlanResponse getOrCreateCurrentPlan(Long tripId) {
-        Trip trip = tripService.getEntity(tripId);
+    public PlanResponse getOrCreateCurrentPlan(Long tripId, Long userId) {
+        Trip trip = tripService.getOwnedTrip(tripId, userId);
         Plan plan = planRepository.findTopByTripIdOrderByVersionDesc(tripId)
                 .orElseGet(() -> createInitialPlan(trip));
         return PlanResponse.from(plan);
@@ -63,9 +63,10 @@ public class PlanService {
      * 특정 일자에 일정 항목 추가. place 가 있으면 수동 Place 생성 후 연결.
      */
     @Transactional
-    public PlanResponse addItem(Long planDayId, AddPlanItemRequest request) {
+    public PlanResponse addItem(Long planDayId, AddPlanItemRequest request, Long userId) {
         PlanDay day = planDayRepository.findById(planDayId)
                 .orElseThrow(() -> new NotFoundException("일자를 찾을 수 없습니다: " + planDayId));
+        tripService.getOwnedTrip(day.getPlan().getTripId(), userId); // 소유권 검증
 
         Place place = createPlaceIfPresent(request.place());
 
@@ -85,9 +86,10 @@ public class PlanService {
     }
 
     @Transactional
-    public void deleteItem(Long planItemId) {
+    public void deleteItem(Long planItemId, Long userId) {
         PlanItem item = planItemRepository.findById(planItemId)
                 .orElseThrow(() -> new NotFoundException("일정 항목을 찾을 수 없습니다: " + planItemId));
+        tripService.getOwnedTrip(item.getPlanDay().getPlan().getTripId(), userId);
         planItemRepository.delete(item);
     }
 
@@ -95,10 +97,11 @@ public class PlanService {
      * 같은 일자 안에서 항목 순서를 위/아래로 이동(인접 항목과 sort_order 교환).
      */
     @Transactional
-    public PlanResponse moveItem(Long planItemId, boolean up) {
+    public PlanResponse moveItem(Long planItemId, boolean up, Long userId) {
         PlanItem item = planItemRepository.findById(planItemId)
                 .orElseThrow(() -> new NotFoundException("일정 항목을 찾을 수 없습니다: " + planItemId));
         PlanDay day = item.getPlanDay();
+        tripService.getOwnedTrip(day.getPlan().getTripId(), userId);
 
         List<PlanItem> ordered = day.getItems().stream()
                 .sorted(Comparator.comparingInt(PlanItem::getSortOrder).thenComparing(PlanItem::getId))

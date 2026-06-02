@@ -1,6 +1,6 @@
 package com.travel.planner.trip.service;
 
-import com.travel.planner.account.service.UserService;
+import com.travel.planner.common.exception.ForbiddenException;
 import com.travel.planner.common.exception.NotFoundException;
 import com.travel.planner.trip.dto.TripCreateRequest;
 import com.travel.planner.trip.dto.TripResponse;
@@ -17,15 +17,11 @@ import org.springframework.transaction.annotation.Transactional;
 public class TripService {
 
     private final TripRepository tripRepository;
-    private final UserService userService;
 
     @Transactional
-    public TripResponse create(TripCreateRequest request) {
-        // 사용자 존재 검증 (없으면 404)
-        userService.getEntity(request.userId());
-
+    public TripResponse create(Long userId, TripCreateRequest request) {
         Trip trip = Trip.builder()
-                .userId(request.userId())
+                .userId(userId)
                 .title(request.title())
                 .startDate(request.startDate())
                 .endDate(request.endDate())
@@ -36,8 +32,8 @@ public class TripService {
         return TripResponse.from(tripRepository.save(trip));
     }
 
-    public TripResponse get(Long id) {
-        return TripResponse.from(getEntity(id));
+    public TripResponse get(Long id, Long userId) {
+        return TripResponse.from(getOwnedTrip(id, userId));
     }
 
     public List<TripResponse> listByUser(Long userId) {
@@ -49,5 +45,14 @@ public class TripService {
     public Trip getEntity(Long id) {
         return tripRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("여행을 찾을 수 없습니다: " + id));
+    }
+
+    /** 소유권 검증: 본인 여행이 아니면 403. 하위 리소스(일정/기록/숙박)의 접근 게이트로 공용 사용. */
+    public Trip getOwnedTrip(Long tripId, Long userId) {
+        Trip trip = getEntity(tripId);
+        if (!trip.getUserId().equals(userId)) {
+            throw new ForbiddenException("해당 여행에 접근 권한이 없습니다.");
+        }
+        return trip;
     }
 }

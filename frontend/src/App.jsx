@@ -19,12 +19,12 @@ export default function App() {
   // 세션 로그인 상태 확인 (로컬/소셜 공통)
   useEffect(() => {
     api.me()
-      .then((s) => { if (s.authenticated) { setUser(s.user); refreshTrips(s.user.id) } })
+      .then((s) => { if (s.authenticated) { setUser(s.user); refreshTrips() } })
       .catch(() => {})
   }, [])
 
   function onLoggedIn(u) {
-    setUser(u); setError(''); refreshTrips(u.id)
+    setUser(u); setError(''); refreshTrips()
   }
 
   async function logout() {
@@ -32,11 +32,12 @@ export default function App() {
     setUser(null); setTrips([]); setSelectedTrip(null)
   }
 
-  async function refreshTrips(userId) {
+  async function refreshTrips() {
     try {
-      setTrips(await api.listTrips(userId))
+      setTrips(await api.listTrips())
     } catch (e) {
-      setError(e.message)
+      if (e.status === 401) { setUser(null); setTrips([]); setSelectedTrip(null) } // 세션 만료 → 로그인 화면
+      else setError(e.message)
     }
   }
 
@@ -59,9 +60,8 @@ export default function App() {
 
           {user && (
             <TripSection
-              user={user}
               trips={trips}
-              onCreated={() => refreshTrips(user.id)}
+              onCreated={refreshTrips}
               onOpen={setSelectedTrip}
               onError={setError}
             />
@@ -178,7 +178,7 @@ function SignupForm({ onLoggedIn, onError }) {
   )
 }
 
-function TripSection({ user, trips, onCreated, onOpen, onError }) {
+function TripSection({ trips, onCreated, onOpen, onError }) {
   const empty = { title: '', startDate: '', endDate: '', headcount: 1, budgetLimit: '', concept: '' }
   const [form, setForm] = useState(empty)
   const [busy, setBusy] = useState(false)
@@ -188,7 +188,6 @@ function TripSection({ user, trips, onCreated, onOpen, onError }) {
     setBusy(true)
     try {
       await api.createTrip({
-        userId: user.id,
         title: form.title,
         startDate: form.startDate,
         endDate: form.endDate,

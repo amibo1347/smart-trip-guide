@@ -12,7 +12,6 @@ import java.time.LocalDate;
  * 여행 생성 요청. (인증 도입 전까지 userId를 명시적으로 전달)
  */
 public record TripCreateRequest(
-        @NotNull Long userId,
         @NotBlank @Size(max = 100) String title,
         @NotNull LocalDate startDate,
         @NotNull LocalDate endDate,

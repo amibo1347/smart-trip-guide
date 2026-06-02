@@ -38,8 +38,8 @@ public class TrackingService {
 
     // ── 위치 ──
     @Transactional
-    public LocationResponse recordLocation(Long tripId, LocationRequest req) {
-        tripService.getEntity(tripId);
+    public LocationResponse recordLocation(Long tripId, LocationRequest req, Long userId) {
+        tripService.getOwnedTrip(tripId, userId);
         LocationLog saved = locationRepo.findByTripIdAndClientUuid(tripId, req.clientUuid())
                 .orElseGet(() -> locationRepo.save(LocationLog.builder()
                         .tripId(tripId)
@@ -52,15 +52,16 @@ public class TrackingService {
         return LocationResponse.from(saved);
     }
 
-    public List<LocationResponse> listLocations(Long tripId) {
+    public List<LocationResponse> listLocations(Long tripId, Long userId) {
+        tripService.getOwnedTrip(tripId, userId);
         return locationRepo.findByTripIdOrderByRecordedAtDesc(tripId).stream()
                 .map(LocationResponse::from).toList();
     }
 
     // ── 기분 ──
     @Transactional
-    public MoodResponse recordMood(Long tripId, MoodRequest req) {
-        tripService.getEntity(tripId);
+    public MoodResponse recordMood(Long tripId, MoodRequest req, Long userId) {
+        tripService.getOwnedTrip(tripId, userId);
         MoodLog saved = moodRepo.findByTripIdAndClientUuid(tripId, req.clientUuid())
                 .orElseGet(() -> moodRepo.save(MoodLog.builder()
                         .tripId(tripId)
@@ -72,15 +73,16 @@ public class TrackingService {
         return MoodResponse.from(saved);
     }
 
-    public List<MoodResponse> listMoods(Long tripId) {
+    public List<MoodResponse> listMoods(Long tripId, Long userId) {
+        tripService.getOwnedTrip(tripId, userId);
         return moodRepo.findByTripIdOrderByRecordedAtDesc(tripId).stream()
                 .map(MoodResponse::from).toList();
     }
 
     // ── 지출 ──
     @Transactional
-    public ExpenseResponse recordExpense(Long tripId, ExpenseRequest req) {
-        tripService.getEntity(tripId);
+    public ExpenseResponse recordExpense(Long tripId, ExpenseRequest req, Long userId) {
+        tripService.getOwnedTrip(tripId, userId);
         Expense saved = expenseRepo.findByTripIdAndClientUuid(tripId, req.clientUuid())
                 .orElseGet(() -> expenseRepo.save(Expense.builder()
                         .tripId(tripId)
@@ -93,12 +95,14 @@ public class TrackingService {
         return ExpenseResponse.from(saved);
     }
 
-    public List<ExpenseResponse> listExpenses(Long tripId) {
+    public List<ExpenseResponse> listExpenses(Long tripId, Long userId) {
+        tripService.getOwnedTrip(tripId, userId);
         return expenseRepo.findByTripIdOrderBySpentAtDesc(tripId).stream()
                 .map(ExpenseResponse::from).toList();
     }
 
-    public ExpenseSummary expenseSummary(Long tripId) {
+    public ExpenseSummary expenseSummary(Long tripId, Long userId) {
+        tripService.getOwnedTrip(tripId, userId);
         List<Expense> expenses = expenseRepo.findByTripIdOrderBySpentAtDesc(tripId);
         BigDecimal total = BigDecimal.ZERO;
         Map<String, BigDecimal> byCategory = new LinkedHashMap<>();

@@ -1,5 +1,6 @@
 package com.travel.planner.planning.controller;
 
+import com.travel.planner.account.security.CurrentUser;
 import com.travel.planner.planning.dto.AccommodationRequest;
 import com.travel.planner.planning.dto.AccommodationResponse;
 import com.travel.planner.planning.dto.AddPlanItemRequest;
@@ -10,6 +11,7 @@ import jakarta.validation.Valid;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -26,49 +28,53 @@ public class PlanController {
 
     private final PlanService planService;
     private final AccommodationService accommodationService;
+    private final CurrentUser currentUser;
 
     /** 여행의 현재 일정 (없으면 자동 생성). */
     @GetMapping("/api/trips/{tripId}/plan")
-    public PlanResponse getPlan(@PathVariable Long tripId) {
-        return planService.getOrCreateCurrentPlan(tripId);
+    public PlanResponse getPlan(@PathVariable Long tripId, Authentication auth) {
+        return planService.getOrCreateCurrentPlan(tripId, currentUser.requireId(auth));
     }
 
     /** 특정 일자에 일정 항목 추가. */
     @PostMapping("/api/plan-days/{dayId}/items")
     public PlanResponse addItem(@PathVariable Long dayId,
-                                @Valid @RequestBody AddPlanItemRequest request) {
-        return planService.addItem(dayId, request);
+                                @Valid @RequestBody AddPlanItemRequest request,
+                                Authentication auth) {
+        return planService.addItem(dayId, request, currentUser.requireId(auth));
     }
 
     /** 일정 항목 삭제. */
     @DeleteMapping("/api/plan-items/{itemId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void deleteItem(@PathVariable Long itemId) {
-        planService.deleteItem(itemId);
+    public void deleteItem(@PathVariable Long itemId, Authentication auth) {
+        planService.deleteItem(itemId, currentUser.requireId(auth));
     }
 
     /** 일정 항목 순서 이동. direction=UP|DOWN */
     @PatchMapping("/api/plan-items/{itemId}/move")
     public PlanResponse moveItem(@PathVariable Long itemId,
-                                 @RequestParam String direction) {
-        return planService.moveItem(itemId, "UP".equalsIgnoreCase(direction));
+                                 @RequestParam String direction,
+                                 Authentication auth) {
+        return planService.moveItem(itemId, "UP".equalsIgnoreCase(direction), currentUser.requireId(auth));
     }
 
     // ── 숙박 ──
     @GetMapping("/api/trips/{tripId}/accommodations")
-    public List<AccommodationResponse> listAccommodations(@PathVariable Long tripId) {
-        return accommodationService.list(tripId);
+    public List<AccommodationResponse> listAccommodations(@PathVariable Long tripId, Authentication auth) {
+        return accommodationService.list(tripId, currentUser.requireId(auth));
     }
 
     @PostMapping("/api/trips/{tripId}/accommodations")
     public AccommodationResponse addAccommodation(@PathVariable Long tripId,
-                                                  @Valid @RequestBody AccommodationRequest request) {
-        return accommodationService.add(tripId, request);
+                                                  @Valid @RequestBody AccommodationRequest request,
+                                                  Authentication auth) {
+        return accommodationService.add(tripId, request, currentUser.requireId(auth));
     }
 
     @DeleteMapping("/api/accommodations/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void deleteAccommodation(@PathVariable Long id) {
-        accommodationService.delete(id);
+    public void deleteAccommodation(@PathVariable Long id, Authentication auth) {
+        accommodationService.delete(id, currentUser.requireId(auth));
     }
 }
