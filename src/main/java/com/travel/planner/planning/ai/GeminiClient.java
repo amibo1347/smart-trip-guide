@@ -93,7 +93,14 @@ public class GeminiClient {
         }
         if (resp == null) {
             int code = lastError != null ? lastError.getStatusCode().value() : -1;
-            throw new AiException("Gemini 호출 실패 (HTTP " + code + "). 잠시 후 다시 시도하거나 키/모델을 확인하세요.", lastError);
+            String detail = "";
+            if (lastError != null) {
+                String b = lastError.getResponseBodyAsString();
+                if (b != null && !b.isBlank()) {
+                    detail = " — " + b.substring(0, Math.min(500, b.length()));
+                }
+            }
+            throw new AiException("Gemini 호출 실패 (HTTP " + code + ")" + detail, lastError);
         }
 
         // candidates[0].content.parts[0].text
