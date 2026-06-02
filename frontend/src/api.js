@@ -30,6 +30,7 @@ export const api = {
   listTrips: () => request('GET', '/api/trips'), // 세션 사용자의 여행
   // Planning
   getPlan: (tripId) => request('GET', `/api/trips/${tripId}/plan`),
+  generatePlan: (tripId, payload) => request('POST', `/api/trips/${tripId}/plan/generate`, payload),
   addPlanItem: (dayId, payload) => request('POST', `/api/plan-days/${dayId}/items`, payload),
   deletePlanItem: (itemId) => request('DELETE', `/api/plan-items/${itemId}`),
   movePlanItem: (itemId, direction) => request('PATCH', `/api/plan-items/${itemId}/move?direction=${direction}`),

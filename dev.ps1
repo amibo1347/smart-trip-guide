@@ -15,7 +15,8 @@ Get-CimInstance Win32_Process -Filter "Name='java.exe'" |
 
 Write-Host "[2/4] .env 로드..." -ForegroundColor Cyan
 $envFile = Join-Path $PSScriptRoot '.env'
-if (Test-Path $envFile) {
+$envLoaded = Test-Path $envFile
+if ($envLoaded) {
     Get-Content $envFile | ForEach-Object {
         $line = $_.Trim()
         if ($line -and -not $line.StartsWith('#') -and $line.Contains('=')) {
@@ -45,8 +46,9 @@ Write-Host "[4/4] MySQL 기동 + 백엔드 실행 (http://localhost:8082)" -Fore
 docker compose up -d | Out-Null
 
 $ErrorActionPreference = 'Continue'
-# --no-daemon: 방금 주입한 환경변수가 forked JVM 까지 확실히 전달되도록 (데몬 캐시 회피)
-if ($profiles.Count -gt 0) {
+# .env 를 로드했으면 --no-daemon: 주입한 환경변수(GEMINI_API_KEY, OAuth 등)가
+# forked JVM 까지 확실히 전달되도록 데몬 캐시를 회피한다.
+if ($envLoaded) {
     .\gradlew.bat bootRun --console=plain --no-daemon
 } else {
     .\gradlew.bat bootRun --console=plain

@@ -31,6 +31,12 @@ spring:
   jackson:
     time-zone: Asia/Seoul
 
+# AI 일정 생성 (Google Gemini). 키는 .env 의 GEMINI_API_KEY 로 주입(없으면 AI 기능만 비활성).
+# 모델 기본값은 team 프로젝트와 동일한 무료 모델. GEMINI_MODEL 로 변경 가능(예: gemini-2.5-flash).
+gemini:
+  api-key: ${GEMINI_API_KEY:}
+  model: ${GEMINI_MODEL:gemini-2.5-flash-lite}
+
 logging:
   level:
     org.hibernate.SQL: debug

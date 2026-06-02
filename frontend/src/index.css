@@ -195,3 +195,11 @@ button.small { background: #eff6ff; color: var(--blue); padding: 6px 12px; font-
 .cost-in { width: 90px; padding: 4px 6px; margin: 0 3px; border: 1px solid var(--border); border-radius: 6px; }
 .ta { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 9px; font-family: inherit; font-size: 0.95rem; resize: vertical; margin-bottom: 10px; }
 .saved { color: #166534; font-size: 0.85rem; margin-left: 10px; }
+
+/* ── AI 생성 ── */
+.ai-card { background: linear-gradient(135deg, #eef2ff, #faf5ff); border-color: #ddd6fe; }
+.ai-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.ai-head h3 { margin: 0; }
+.ver { font-size: 0.72rem; color: #6d28d9; background: #ede9fe; padding: 3px 8px; border-radius: 999px; }
+.ai-card input { margin-bottom: 8px; }
+.ai-card button { background: linear-gradient(135deg, #7c3aed, #2563eb); }

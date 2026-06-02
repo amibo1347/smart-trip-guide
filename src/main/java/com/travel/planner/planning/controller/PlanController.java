@@ -4,8 +4,10 @@ import com.travel.planner.account.security.CurrentUser;
 import com.travel.planner.planning.dto.AccommodationRequest;
 import com.travel.planner.planning.dto.AccommodationResponse;
 import com.travel.planner.planning.dto.AddPlanItemRequest;
+import com.travel.planner.planning.dto.GeneratePlanRequest;
 import com.travel.planner.planning.dto.PlanResponse;
 import com.travel.planner.planning.service.AccommodationService;
+import com.travel.planner.planning.service.AiPlanService;
 import com.travel.planner.planning.service.PlanService;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -28,12 +30,22 @@ public class PlanController {
 
     private final PlanService planService;
     private final AccommodationService accommodationService;
+    private final AiPlanService aiPlanService;
     private final CurrentUser currentUser;
 
     /** 여행의 현재 일정 (없으면 자동 생성). */
     @GetMapping("/api/trips/{tripId}/plan")
     public PlanResponse getPlan(@PathVariable Long tripId, Authentication auth) {
         return planService.getOrCreateCurrentPlan(tripId, currentUser.requireId(auth));
+    }
+
+    /** AI(Gemini)로 새 일정 버전 생성. */
+    @PostMapping("/api/trips/{tripId}/plan/generate")
+    public PlanResponse generatePlan(@PathVariable Long tripId,
+                                     @Valid @RequestBody(required = false) GeneratePlanRequest request,
+                                     Authentication auth) {
+        String note = request == null ? null : request.note();
+        return aiPlanService.generate(tripId, currentUser.requireId(auth), note);
     }
 
     /** 특정 일자에 일정 항목 추가. */

@@ -35,6 +35,8 @@ export default function Itinerary({ trip, onError }) {
 
   return (
     <div>
+      <AiGenerate trip={trip} plan={plan} onGenerated={setPlan} onError={onError} />
+
       {!plan && <p className="muted">일정 불러오는 중...</p>}
 
       {plan && plan.days.map((day) => (
@@ -103,6 +105,37 @@ export default function Itinerary({ trip, onError }) {
         )}
       </section>
     </div>
+  )
+}
+
+function AiGenerate({ trip, plan, onGenerated, onError }) {
+  const [note, setNote] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  async function generate() {
+    if (!window.confirm('AI가 새 일정 버전을 생성합니다. 기존 일정은 이전 버전으로 보관됩니다. 진행할까요?')) return
+    setBusy(true)
+    try {
+      onGenerated(await api.generatePlan(trip.id, { note: note || null }))
+    } catch (e) {
+      onError(e.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <section className="card ai-card">
+      <div className="ai-head">
+        <h3>✨ AI 일정 생성</h3>
+        {plan && <span className="ver">v{plan.version} · {plan.generatedBy === 'AI' ? 'AI 생성' : '직접 작성'}</span>}
+      </div>
+      <input placeholder="지역·요청사항 (예: 제주 동부 위주, 맛집 많이)" value={note}
+             onChange={(e) => setNote(e.target.value)} disabled={busy} />
+      <button onClick={generate} disabled={busy}>
+        {busy ? '생성 중... (수 초 소요)' : '✨ AI로 일정 만들기'}
+      </button>
+    </section>
   )
 }
 

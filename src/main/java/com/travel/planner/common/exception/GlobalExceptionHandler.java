@@ -39,6 +39,12 @@ public class GlobalExceptionHandler {
                 .body(ErrorResponse.of(403, "Forbidden", e.getMessage()));
     }
 
+    @ExceptionHandler(AiException.class)
+    public ResponseEntity<ErrorResponse> handleAi(AiException e) {
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                .body(ErrorResponse.of(503, "Service Unavailable", e.getMessage()));
+    }
+
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ErrorResponse> handleIllegalArgument(IllegalArgumentException e) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
