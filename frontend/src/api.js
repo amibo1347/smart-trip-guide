@@ -30,9 +30,23 @@ export const api = {
   getPlan: (tripId) => request('GET', `/api/trips/${tripId}/plan`),
   addPlanItem: (dayId, payload) => request('POST', `/api/plan-days/${dayId}/items`, payload),
   deletePlanItem: (itemId) => request('DELETE', `/api/plan-items/${itemId}`),
+  movePlanItem: (itemId, direction) => request('PATCH', `/api/plan-items/${itemId}/move?direction=${direction}`),
+  listAccommodations: (tripId) => request('GET', `/api/trips/${tripId}/accommodations`),
+  addAccommodation: (tripId, payload) => request('POST', `/api/trips/${tripId}/accommodations`, payload),
+  deleteAccommodation: (id) => request('DELETE', `/api/accommodations/${id}`),
   // Auth
   me: () => request('GET', '/api/auth/me'),
   logout: () => request('POST', '/logout'),
+  // Tracking (여행 중 기록)
+  recordLocation: (tripId, payload) => request('POST', `/api/trips/${tripId}/locations`, payload),
+  listLocations: (tripId) => request('GET', `/api/trips/${tripId}/locations`),
+  recordMood: (tripId, payload) => request('POST', `/api/trips/${tripId}/moods`, payload),
+  listMoods: (tripId) => request('GET', `/api/trips/${tripId}/moods`),
+  recordExpense: (tripId, payload) => request('POST', `/api/trips/${tripId}/expenses`, payload),
+  listExpenses: (tripId) => request('GET', `/api/trips/${tripId}/expenses`),
+  expenseSummary: (tripId) => request('GET', `/api/trips/${tripId}/expenses/summary`),
+  // 오프라인 큐 재전송용 일반 POST
+  post: (path, body) => request('POST', path, body),
 }
 
 // 소셜 로그인 시작 (백엔드 OAuth2 인가 엔드포인트로 전체 페이지 이동)

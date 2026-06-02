@@ -9,41 +9,32 @@ const TYPE_LABEL = {
   ACTIVITY: '🎯 액티비티',
 }
 
-export default function Itinerary({ trip, onBack, onError }) {
+export default function Itinerary({ trip, onError }) {
   const [plan, setPlan] = useState(null)
-  const [openDay, setOpenDay] = useState(null) // 일정 추가 폼이 열린 dayId
+  const [accs, setAccs] = useState([])
+  const [openDay, setOpenDay] = useState(null)
+  const [openAcc, setOpenAcc] = useState(false)
 
-  async function load() {
-    try {
-      setPlan(await api.getPlan(trip.id))
-    } catch (e) {
-      onError(e.message)
-    }
+  async function loadPlan() {
+    try { setPlan(await api.getPlan(trip.id)) } catch (e) { onError(e.message) }
   }
-
-  useEffect(() => { load() /* eslint-disable-next-line */ }, [trip.id])
+  async function loadAccs() {
+    try { setAccs(await api.listAccommodations(trip.id)) } catch (e) { onError(e.message) }
+  }
+  useEffect(() => { loadPlan(); loadAccs() /* eslint-disable-next-line */ }, [trip.id])
 
   async function removeItem(itemId) {
-    try {
-      await api.deletePlanItem(itemId)
-      load()
-    } catch (e) {
-      onError(e.message)
-    }
+    try { await api.deletePlanItem(itemId); loadPlan() } catch (e) { onError(e.message) }
+  }
+  async function move(itemId, direction) {
+    try { setPlan(await api.movePlanItem(itemId, direction)) } catch (e) { onError(e.message) }
+  }
+  async function removeAcc(id) {
+    try { await api.deleteAccommodation(id); loadAccs() } catch (e) { onError(e.message) }
   }
 
   return (
     <div>
-      <button className="link" onClick={onBack}>← 내 여행으로</button>
-
-      <section className="card">
-        <h2>🗺 {trip.title}</h2>
-        <p className="muted">
-          {trip.startDate} ~ {trip.endDate} · 👥 {trip.headcount}명
-          {trip.concept && <> · 🏷 {trip.concept}</>}
-        </p>
-      </section>
-
       {!plan && <p className="muted">일정 불러오는 중...</p>}
 
       {plan && plan.days.map((day) => (
@@ -57,9 +48,13 @@ export default function Itinerary({ trip, onBack, onError }) {
 
           {day.items.length === 0 && <p className="muted small-text">아직 일정이 없습니다.</p>}
           <ul className="items">
-            {day.items.map((it) => (
+            {day.items.map((it, idx) => (
               <li key={it.id}>
                 <div className="item-main">
+                  <span className="reorder">
+                    <button className="rb" disabled={idx === 0} onClick={() => move(it.id, 'UP')} title="위로">▲</button>
+                    <button className="rb" disabled={idx === day.items.length - 1} onClick={() => move(it.id, 'DOWN')} title="아래로">▼</button>
+                  </span>
                   <span className="type-badge">{TYPE_LABEL[it.type] ?? it.type}</span>
                   <b>{it.title}</b>
                   <button className="del" onClick={() => removeItem(it.id)} title="삭제">✕</button>
@@ -76,21 +71,42 @@ export default function Itinerary({ trip, onBack, onError }) {
           </ul>
 
           {openDay === day.id && (
-            <AddItemForm
-              dayId={day.id}
-              onAdded={(p) => { setPlan(p); setOpenDay(null) }}
-              onError={onError}
-            />
+            <AddItemForm dayId={day.id} onAdded={(p) => { setPlan(p); setOpenDay(null) }} onError={onError} />
           )}
         </section>
       ))}
+
+      {/* 숙박 */}
+      <section className="card">
+        <div className="day-head">
+          <h3>🏨 숙박 ({accs.length})</h3>
+          <button className="small" onClick={() => setOpenAcc(!openAcc)}>{openAcc ? '닫기' : '+ 숙박'}</button>
+        </div>
+        {accs.length === 0 && <p className="muted small-text">등록된 숙소가 없습니다.</p>}
+        <ul className="items">
+          {accs.map((a) => (
+            <li key={a.id}>
+              <div className="item-main">
+                <b>{a.name}</b>
+                <button className="del" onClick={() => removeAcc(a.id)} title="삭제">✕</button>
+              </div>
+              <div className="item-meta">
+                🛏 {a.checkIn} ~ {a.checkOut}
+                {a.cost != null && <> · 💰 {Number(a.cost).toLocaleString()}원</>}
+                {a.place?.address && <> · 📍 {a.place.address}</>}
+              </div>
+            </li>
+          ))}
+        </ul>
+        {openAcc && (
+          <AddAccForm tripId={trip.id} onAdded={() => { setOpenAcc(false); loadAccs() }} onError={onError} />
+        )}
+      </section>
     </div>
   )
 }
 
-function fmt(t) {
-  return t ? t.slice(0, 5) : '' // "HH:mm:ss" → "HH:mm"
-}
+function fmt(t) { return t ? t.slice(0, 5) : '' }
 
 function AddItemForm({ dayId, onAdded, onError }) {
   const empty = { type: 'SPOT', title: '', plannedStart: '', plannedEnd: '', estCost: '', placeName: '', address: '' }
@@ -107,18 +123,12 @@ function AddItemForm({ dayId, onAdded, onError }) {
         plannedStart: form.plannedStart || null,
         plannedEnd: form.plannedEnd || null,
         estCost: form.estCost === '' ? null : Number(form.estCost),
-        place: form.placeName
-          ? { name: form.placeName, address: form.address || null }
-          : null,
+        place: form.placeName ? { name: form.placeName, address: form.address || null } : null,
       }
       const updated = await api.addPlanItem(dayId, payload)
       setForm(empty)
       onAdded(updated)
-    } catch (err) {
-      onError(err.message)
-    } finally {
-      setBusy(false)
-    }
+    } catch (err) { onError(err.message) } finally { setBusy(false) }
   }
 
   return (
@@ -135,20 +145,52 @@ function AddItemForm({ dayId, onAdded, onError }) {
         </label>
       </div>
       <div className="row">
-        <label>시작 <input type="time" value={form.plannedStart}
-               onChange={(e) => setForm({ ...form, plannedStart: e.target.value })} /></label>
-        <label>종료 <input type="time" value={form.plannedEnd}
-               onChange={(e) => setForm({ ...form, plannedEnd: e.target.value })} /></label>
-        <label>예상비용 <input type="number" min="0" placeholder="원" value={form.estCost}
-               onChange={(e) => setForm({ ...form, estCost: e.target.value })} /></label>
+        <label>시작 <input type="time" value={form.plannedStart} onChange={(e) => setForm({ ...form, plannedStart: e.target.value })} /></label>
+        <label>종료 <input type="time" value={form.plannedEnd} onChange={(e) => setForm({ ...form, plannedEnd: e.target.value })} /></label>
+        <label>예상비용 <input type="number" min="0" placeholder="원" value={form.estCost} onChange={(e) => setForm({ ...form, estCost: e.target.value })} /></label>
       </div>
       <div className="row">
-        <label style={{ flex: 1 }}>장소명(선택) <input value={form.placeName} placeholder="수동 입력"
-               onChange={(e) => setForm({ ...form, placeName: e.target.value })} /></label>
-        <label style={{ flex: 1 }}>주소(선택) <input value={form.address}
-               onChange={(e) => setForm({ ...form, address: e.target.value })} /></label>
+        <label style={{ flex: 1 }}>장소명(선택) <input value={form.placeName} onChange={(e) => setForm({ ...form, placeName: e.target.value })} /></label>
+        <label style={{ flex: 1 }}>주소(선택) <input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} /></label>
       </div>
       <button disabled={busy}>{busy ? '추가 중...' : '이 일자에 추가'}</button>
+    </form>
+  )
+}
+
+function AddAccForm({ tripId, onAdded, onError }) {
+  const empty = { name: '', checkIn: '', checkOut: '', cost: '', address: '' }
+  const [form, setForm] = useState(empty)
+  const [busy, setBusy] = useState(false)
+
+  async function submit(e) {
+    e.preventDefault()
+    setBusy(true)
+    try {
+      await api.addAccommodation(tripId, {
+        name: form.name,
+        checkIn: form.checkIn,
+        checkOut: form.checkOut,
+        cost: form.cost === '' ? null : Number(form.cost),
+        address: form.address || null,
+      })
+      setForm(empty)
+      onAdded()
+    } catch (err) { onError(err.message) } finally { setBusy(false) }
+  }
+
+  return (
+    <form className="add-form" onSubmit={submit}>
+      <input placeholder="숙소명" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
+      <div className="row">
+        <label>체크인 <input type="date" value={form.checkIn} onChange={(e) => setForm({ ...form, checkIn: e.target.value })} required /></label>
+        <label>체크아웃 <input type="date" value={form.checkOut} onChange={(e) => setForm({ ...form, checkOut: e.target.value })} required /></label>
+      </div>
+      <div className="row">
+        <label style={{ flex: 1 }}>비용 <input type="number" min="0" placeholder="원" value={form.cost} onChange={(e) => setForm({ ...form, cost: e.target.value })} /></label>
+        <label style={{ flex: 2 }}>주소(선택) <input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} /></label>
+      </div>
+      <button disabled={busy}>{busy ? '추가 중...' : '숙박 추가'}</button>
     </form>
   )
 }

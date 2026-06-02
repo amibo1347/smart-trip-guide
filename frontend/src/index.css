@@ -147,3 +147,27 @@ button.small { background: #eff6ff; color: var(--blue); padding: 6px 12px; font-
 
 .add-form { margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--border); }
 .add-form select { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 9px; font-size: 0.95rem; }
+
+/* ── 탭 ── */
+.tabs { display: flex; gap: 8px; margin-top: 12px; }
+.tab { flex: 1; background: #f1f5f9; color: var(--muted); border: 1px solid var(--border); padding: 9px; font-weight: 600; }
+.tab.active { background: var(--blue); color: #fff; border-color: var(--blue); }
+
+/* ── 순서 변경 버튼 ── */
+.reorder { display: inline-flex; flex-direction: column; gap: 1px; }
+.rb { background: #f1f5f9; color: #475569; border: 1px solid var(--border); padding: 0 6px; font-size: 0.65rem; line-height: 1.3; border-radius: 5px; }
+.rb:disabled { opacity: 0.3; }
+
+/* ── 기록(Tracking) ── */
+.netbar { font-size: 0.82rem; padding: 8px 12px; border-radius: 9px; margin-bottom: 12px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.netbar.on { background: #dcfce7; color: #166534; }
+.netbar.off { background: #fef2f2; color: #991b1b; }
+.pending { margin-left: auto; display: inline-flex; gap: 6px; align-items: center; font-weight: 600; }
+.moodbar { display: flex; flex-wrap: wrap; gap: 6px; }
+.mood { background: #f8fafc; border: 1px solid var(--border); font-size: 1.4rem; padding: 6px 10px; border-radius: 10px; }
+.moodlog { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 4px; font-size: 1.3rem; }
+.moodchip { line-height: 1; }
+.summary { margin-bottom: 10px; }
+.bycat { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.catchip { font-size: 0.75rem; background: #eff6ff; color: #1e40af; padding: 3px 8px; border-radius: 999px; }
+.card h3 { font-size: 1rem; margin: 0 0 10px; }

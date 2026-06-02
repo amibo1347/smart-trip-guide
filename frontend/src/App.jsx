@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api, socialLoginUrl } from './api.js'
-import Itinerary from './Itinerary.jsx'
+import TripDetail from './TripDetail.jsx'
 
 export default function App() {
   const [health, setHealth] = useState('확인 중...')
@@ -47,7 +47,7 @@ export default function App() {
       {error && <div className="error" onClick={() => setError('')}>⚠ {error} (클릭하여 닫기)</div>}
 
       {selectedTrip ? (
-        <Itinerary trip={selectedTrip} onBack={() => setSelectedTrip(null)} onError={setError} />
+        <TripDetail trip={selectedTrip} onBack={() => setSelectedTrip(null)} onError={setError} />
       ) : (
         <>
           <UserSection

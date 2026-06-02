@@ -74,4 +74,8 @@ public class PlanItem extends BaseEntity {
     void assignDay(PlanDay planDay) {
         this.planDay = planDay;
     }
+
+    public void changeSortOrder(int sortOrder) {
+        this.sortOrder = sortOrder;
+    }
 }

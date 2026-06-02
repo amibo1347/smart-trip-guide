@@ -17,6 +17,8 @@ import com.travel.planner.planning.repository.PlaceRepository;
 import com.travel.planner.trip.entity.Trip;
 import com.travel.planner.trip.service.TripService;
 import java.time.LocalDate;
+import java.util.Comparator;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -87,6 +89,29 @@ public class PlanService {
         PlanItem item = planItemRepository.findById(planItemId)
                 .orElseThrow(() -> new NotFoundException("일정 항목을 찾을 수 없습니다: " + planItemId));
         planItemRepository.delete(item);
+    }
+
+    /**
+     * 같은 일자 안에서 항목 순서를 위/아래로 이동(인접 항목과 sort_order 교환).
+     */
+    @Transactional
+    public PlanResponse moveItem(Long planItemId, boolean up) {
+        PlanItem item = planItemRepository.findById(planItemId)
+                .orElseThrow(() -> new NotFoundException("일정 항목을 찾을 수 없습니다: " + planItemId));
+        PlanDay day = item.getPlanDay();
+
+        List<PlanItem> ordered = day.getItems().stream()
+                .sorted(Comparator.comparingInt(PlanItem::getSortOrder).thenComparing(PlanItem::getId))
+                .toList();
+        int idx = ordered.indexOf(item);
+        int swapIdx = up ? idx - 1 : idx + 1;
+        if (swapIdx >= 0 && swapIdx < ordered.size()) {
+            PlanItem other = ordered.get(swapIdx);
+            int tmp = item.getSortOrder();
+            item.changeSortOrder(other.getSortOrder());
+            other.changeSortOrder(tmp);
+        }
+        return PlanResponse.from(day.getPlan());
     }
 
     private Place createPlaceIfPresent(PlaceInput input) {
