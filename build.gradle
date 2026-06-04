@@ -43,6 +43,11 @@ tasks.named('test') {
 	useJUnitPlatform()
 }
 
+// 실행 불가한 plain jar 생성 안 함 → build/libs 에 bootJar(실행본) 하나만 남아 Docker COPY 가 단순해짐.
+tasks.named('jar') {
+	enabled = false
+}
+
 // ===== 프론트엔드(React PWA) 통합 빌드 =====
 // frontend/ 를 빌드해 Spring 정적 리소스로 번들 → 백엔드(8082) 한 곳에서 화면까지 서빙.
 def frontendDir = file("$projectDir/frontend")
