@@ -92,6 +92,8 @@ export const api = {
   },
   // Review (여행 후 복기)
   getReview: (tripId) => request('GET', `/api/trips/${tripId}/review`),
+  reviewReport: (tripId, lang) => request('POST', `/api/trips/${tripId}/review/report?lang=${lang}`), // AI 회고 리포트
+
   upsertActual: (itemId, payload) => request('PUT', `/api/plan-items/${itemId}/actual`, payload),
   saveFeedback: (tripId, payload) => request('PUT', `/api/trips/${tripId}/feedback`, payload),
   // 오프라인 큐 재전송용 일반 POST

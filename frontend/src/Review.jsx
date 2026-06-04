@@ -25,6 +25,8 @@ export default function Review({ trip, onError }) {
 
   return (
     <div>
+      <ReportCard trip={trip} onError={onError} />
+
       {/* 요약 */}
       <section className="card">
         <h3>📊 {t('한눈에 보기')}</h3>
@@ -86,6 +88,56 @@ export default function Review({ trip, onError }) {
 
 function Stat({ label, value }) {
   return <div className="stat"><div className="stat-v">{value}</div><div className="stat-l">{label}</div></div>
+}
+
+/** 기록 데이터를 바탕으로 AI가 여행을 요약. 현재 UI 언어로 생성. */
+function ReportCard({ trip, onError }) {
+  const { t, lang } = useI18n()
+  const [report, setReport] = useState(null)
+  const [busy, setBusy] = useState(false)
+
+  async function generate() {
+    setBusy(true)
+    try { setReport(await api.reviewReport(trip.id, lang)) }
+    catch (e) { onError(e.message) }
+    finally { setBusy(false) }
+  }
+
+  return (
+    <section className="card report-card">
+      <div className="day-head">
+        <h3>🤖 {t('AI 회고 리포트')}</h3>
+        {report && <button className="small" onClick={generate} disabled={busy}>{busy ? t('생성 중...') : t('다시 생성')}</button>}
+      </div>
+      {!report && !busy && (
+        <>
+          <p className="muted small-text">{t('기록한 일정·지출·기분을 바탕으로 AI가 이번 여행을 정리해 드려요.')}</p>
+          <button onClick={generate} disabled={busy}>✨ {t('리포트 만들기')}</button>
+        </>
+      )}
+      {busy && <p className="muted small-text">{t('AI가 회고를 작성하는 중이에요... (수 초 소요)')}</p>}
+      {report && (
+        <div className="report">
+          <p className="report-title">“{report.title}”</p>
+          {report.highlights?.length > 0 && (
+            <div className="report-sec">
+              <h4>✨ {t('하이라이트')}</h4>
+              <ul>{report.highlights.map((h, i) => <li key={i}>{h}</li>)}</ul>
+            </div>
+          )}
+          {report.spending && <div className="report-sec"><h4>💰 {t('지출 이야기')}</h4><p>{report.spending}</p></div>}
+          {report.mood && <div className="report-sec"><h4>🎭 {t('기분과 만족도')}</h4><p>{report.mood}</p></div>}
+          {report.tips?.length > 0 && (
+            <div className="report-sec">
+              <h4>🧭 {t('다음 여행 팁')}</h4>
+              <ul>{report.tips.map((tip, i) => <li key={i}>{tip}</li>)}</ul>
+            </div>
+          )}
+          <p className="muted small-text">{t('※ 기록된 데이터를 바탕으로 AI가 생성했어요.')}</p>
+        </div>
+      )}
+    </section>
+  )
 }
 
 function MapView({ locations }) {
