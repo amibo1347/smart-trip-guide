@@ -10,16 +10,22 @@
 
 * { box-sizing: border-box; }
 
+html {
+  -webkit-text-size-adjust: 100%; /* iOS 가로모드 글자 임의 확대 방지 */
+}
+
 body {
   margin: 0;
   background: var(--bg);
   color: var(--text);
+  -webkit-tap-highlight-color: rgba(37, 99, 235, 0.12);
 }
 
 .app {
   max-width: 640px;
   margin: 0 auto;
-  padding: 16px 16px 48px;
+  /* 하단/좌우는 노치·홈 인디케이터 세이프에어리어 반영 */
+  padding: 16px max(16px, env(safe-area-inset-right)) calc(48px + env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
 }
 
 header {
@@ -68,8 +74,8 @@ input {
 }
 input:focus { outline: 2px solid var(--blue); border-color: var(--blue); }
 
-.row { display: flex; gap: 10px; }
-.row label { flex: 1; font-size: 0.8rem; color: var(--muted); display: flex; flex-direction: column; gap: 4px; }
+.row { display: flex; gap: 10px; flex-wrap: wrap; }
+.row label { flex: 1 1 130px; min-width: 130px; font-size: 0.8rem; color: var(--muted); display: flex; flex-direction: column; gap: 4px; }
 
 button {
   background: var(--blue);
@@ -308,8 +314,10 @@ button.ghost, .share-actions .ghost { background: transparent; color: var(--mute
 
 /* ── 번역 플로팅 버튼 ── */
 .fab-translate {
-  position: fixed; right: 16px; bottom: 84px; z-index: 1000;
-  width: 52px; height: 52px; border-radius: 50%; padding: 0;
+  position: fixed; z-index: 1000;
+  right: calc(16px + env(safe-area-inset-right));
+  bottom: calc(24px + env(safe-area-inset-bottom));
+  width: 56px; height: 56px; border-radius: 50%; padding: 0;
   font-size: 1.5rem; background: var(--blue); color: #fff;
   box-shadow: 0 4px 14px rgba(37, 99, 235, 0.4); display: flex;
   align-items: center; justify-content: center;
@@ -363,3 +371,27 @@ button.ghost, .share-actions .ghost { background: transparent; color: var(--mute
 .report-sec p { margin: 0; font-size: 0.92rem; line-height: 1.6; color: #1f2937; }
 .report-sec ul { margin: 4px 0 0; padding-left: 18px; }
 .report-sec li { font-size: 0.92rem; line-height: 1.55; margin-bottom: 3px; }
+
+/* ── 반응형: 모바일(≤640px) ── */
+@media (max-width: 640px) {
+  /* iOS 입력 포커스 시 자동 확대(줌) 방지 — 폼 컨트롤 16px 이상 */
+  input, select, textarea,
+  .ta, .cost-in, .add-form select, .ai-card select,
+  .tr-pane textarea, .tr-target select { font-size: 16px; }
+
+  /* 손가락 터치 타깃 키우기 */
+  .del, .edit { padding: 6px 10px; font-size: 1rem; }
+  .rb { padding: 3px 10px; }
+  .star { font-size: 1.2rem; padding: 0 2px; }
+}
+
+/* ── 반응형: 작은 폰(≤400px) ── */
+@media (max-width: 400px) {
+  .card { padding: 14px 14px; border-radius: 12px; }
+  header h1 { font-size: 1.2rem; }
+  .stat-grid { gap: 6px; }
+  .stat { padding: 10px 4px; }
+  .stat-v { font-size: 1.15rem; }
+  .tabs { gap: 6px; }
+  .tab { padding: 9px 4px; font-size: 0.9rem; }
+}
