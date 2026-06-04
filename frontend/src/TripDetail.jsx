@@ -4,6 +4,7 @@ import Itinerary from './Itinerary.jsx'
 import Tracking from './Tracking.jsx'
 import Review from './Review.jsx'
 import { useI18n } from './i18n/index.jsx'
+import { copyToClipboard, shareOrCopy } from './utils/clipboard.js'
 
 /**
  * 여행 상세 화면. 탭으로 [일정(여행 전)] / [기록(여행 중)] / [복기] 전환.
@@ -58,16 +59,11 @@ function SharePanel({ trip, onError }) {
   }
   async function share() {
     if (!url) return
-    if (navigator.share) {
-      try { await navigator.share({ title: trip.title, url }) } catch { /* 취소 무시 */ }
-    } else {
-      try { await navigator.clipboard.writeText(url); alert(t('링크가 복사되었습니다.')) }
-      catch { window.prompt(t('아래 링크를 복사하세요'), url) }
-    }
+    const r = await shareOrCopy({ title: trip.title, url, promptMsg: t('아래 링크를 복사하세요') })
+    if (r === 'copied') alert(t('링크가 복사되었습니다.'))
   }
   async function copy() {
-    try { await navigator.clipboard.writeText(url); alert(t('링크가 복사되었습니다.')) }
-    catch { window.prompt(t('아래 링크를 복사하세요'), url) }
+    if (await copyToClipboard(url, t('아래 링크를 복사하세요'))) alert(t('링크가 복사되었습니다.'))
   }
 
   if (!url) {

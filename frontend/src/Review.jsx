@@ -3,8 +3,10 @@ import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { api } from './api.js'
 import { useI18n } from './i18n/index.jsx'
-
-const TYPE_LABEL = { SPOT: '명소', MEAL: '식사', MOVE: '이동', STAY: '숙박', ACTIVITY: '액티비티' }
+import { fmtDt, pct, won } from './utils/format.js'
+import { createMap, pinIcon, popupHtml, ROUTE_COLOR } from './utils/mapMarkers.js'
+import { PLAN_TYPE, typeName } from './constants/labels.js'
+import Row from './components/Row.jsx'
 
 export default function Review({ trip, onError }) {
   const { t } = useI18n()
@@ -82,17 +84,8 @@ export default function Review({ trip, onError }) {
   )
 }
 
-function won(v, unit = '원') { return `${Number(v).toLocaleString()}${unit}` }
-function pct(a, b) {
-  const p = Number(b) > 0 ? Math.min(100, (Number(a) / Number(b)) * 100) : 0
-  return `${p}%`
-}
-
 function Stat({ label, value }) {
   return <div className="stat"><div className="stat-v">{value}</div><div className="stat-l">{label}</div></div>
-}
-function Row({ k, v, strong, cls }) {
-  return <div className="brow"><span>{k}</span><b className={cls}>{strong ? <b>{v}</b> : v}</b></div>
 }
 
 function MapView({ locations }) {
@@ -102,20 +95,17 @@ function MapView({ locations }) {
 
   useEffect(() => {
     if (mapRef.current) return
-    const map = L.map(ref.current, { attributionControl: false })
+    const map = createMap(ref.current)
     mapRef.current = map
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 19,
-    }).addTo(map)
 
     // 시간순(오래된→최신)으로 사진 핀 + 경로
     const ordered = [...locations].reverse()
     const pts = ordered.map((l) => [Number(l.latitude), Number(l.longitude)])
     ordered.forEach((l, i) => {
-      L.marker(pts[i], { icon: pinIcon(l) }).bindPopup(popupHtml(l, t)).addTo(map)
+      L.marker(pts[i], { icon: pinIcon(l) }).bindPopup(popupHtml(l, t, fmtDt)).addTo(map)
     })
     if (pts.length > 1) {
-      L.polyline(pts, { color: '#2563eb', weight: 3, opacity: 0.5 }).addTo(map)
+      L.polyline(pts, { color: ROUTE_COLOR, weight: 3, opacity: 0.5 }).addTo(map)
     }
     if (pts.length === 1) map.setView(pts[0], 14)
     else if (pts.length > 1) map.fitBounds(pts, { padding: [30, 30] })
@@ -124,34 +114,6 @@ function MapView({ locations }) {
   }, [locations, t])
 
   return <div ref={ref} className="map" />
-}
-
-function fmtDt(s) { return s ? s.replace('T', ' ').slice(5, 16) : '' }
-
-function pinIcon(l) {
-  if (l.photoUrl) {
-    return L.divIcon({
-      className: 'photo-pin',
-      html: `<div class="pp-img" style="background-image:url('${l.photoUrl}')"></div><div class="pp-tip"></div>`,
-      iconSize: [50, 58], iconAnchor: [25, 58], popupAnchor: [0, -56],
-    })
-  }
-  return L.divIcon({
-    className: 'photo-pin',
-    html: `<div class="pp-dot">${l.mood || '📍'}</div><div class="pp-tip"></div>`,
-    iconSize: [34, 42], iconAnchor: [17, 42], popupAnchor: [0, -40],
-  })
-}
-
-function popupHtml(l, t) {
-  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))
-  const parts = []
-  if (l.photoUrl) parts.push(`<img src="${l.photoUrl}" style="width:180px;border-radius:8px;display:block;margin-bottom:6px"/>`)
-  parts.push(`<div style="font-size:12px;color:#64748b">🕐 ${fmtDt(l.recordedAt)}</div>`)
-  if (l.mood) parts.push(`<div style="font-size:18px">${l.mood}</div>`)
-  if (l.memo) parts.push(`<div style="margin-top:2px">${esc(l.memo)}</div>`)
-  if (l.amount != null) parts.push(`<div style="margin-top:2px">💰 ${Number(l.amount).toLocaleString()}${t('원')}</div>`)
-  return `<div style="min-width:140px">${parts.join('')}</div>`
 }
 
 function ActualRow({ item, onSaved, onError }) {
@@ -182,7 +144,7 @@ function ActualRow({ item, onSaved, onError }) {
                  onChange={(e) => { setVisited(e.target.checked); save({ visited: e.target.checked }) }} />
           {t('방문')}
         </label>
-        <span className="type-badge">{t(TYPE_LABEL[item.type] ?? item.type)}</span>
+        <span className="type-badge">{typeName(t, PLAN_TYPE, item.type)}</span>
         <b className={visited ? '' : 'muted'}>{t('{n}일차', { n: item.dayNo })} · {item.title}</b>
       </div>
       <div className="item-meta actual-row">

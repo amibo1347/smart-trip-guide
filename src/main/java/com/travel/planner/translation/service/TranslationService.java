@@ -3,6 +3,7 @@ package com.travel.planner.translation.service;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.travel.planner.common.exception.AiException;
+import com.travel.planner.common.util.Texts;
 import com.travel.planner.planning.ai.GeminiClient;
 import com.travel.planner.translation.dto.TranslationDtos.TranslationResponse;
 import java.util.Base64;
@@ -83,7 +84,7 @@ public class TranslationService {
             String original = textOf(node.get("original"));
             String translated = textOf(node.get("translated"));
             if (translated != null && !translated.isBlank()) {
-                return new TranslationResponse(blankToNull(original), translated.trim());
+                return new TranslationResponse(Texts.trimToNull(original), translated.trim());
             }
         } catch (Exception ignored) {
             // JSON 이 아니면 아래에서 전체를 번역문으로 처리
@@ -104,10 +105,6 @@ public class TranslationService {
 
     private static String textOf(JsonNode n) {
         return (n == null || n.isNull()) ? null : n.asText();
-    }
-
-    private static String blankToNull(String s) {
-        return (s == null || s.isBlank()) ? null : s.trim();
     }
 
     /** ```json ... ``` 같은 코드펜스 제거. */

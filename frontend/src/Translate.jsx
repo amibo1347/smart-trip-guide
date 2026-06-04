@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { api } from './api.js'
 import { LANGS, useI18n } from './i18n/index.jsx'
+import { copyToClipboard } from './utils/clipboard.js'
 
 const SpeechRecognition = typeof window !== 'undefined'
   && (window.SpeechRecognition || window.webkitSpeechRecognition)
@@ -117,6 +118,7 @@ function TextMode({ busy, onTranslate, t }) {
 
 function ImageMode({ busy, onTranslate, t }) {
   const [preview, setPreview] = useState(null)
+  useEffect(() => () => { if (preview) URL.revokeObjectURL(preview) }, [preview])
   function pick(e) {
     const f = e.target.files?.[0] || null
     setPreview(f ? URL.createObjectURL(f) : null)
@@ -187,7 +189,7 @@ function VoiceMode({ busy, target, onTranslate, t }) {
 function CopyButton({ text, t }) {
   const [done, setDone] = useState(false)
   async function copy() {
-    try { await navigator.clipboard.writeText(text); setDone(true); setTimeout(() => setDone(false), 1500) } catch { /* noop */ }
+    if (await copyToClipboard(text)) { setDone(true); setTimeout(() => setDone(false), 1500) }
   }
   return <button className="tr-copy" onClick={copy}>{done ? `✓ ${t('복사됨')}` : `⧉ ${t('복사')}`}</button>
 }

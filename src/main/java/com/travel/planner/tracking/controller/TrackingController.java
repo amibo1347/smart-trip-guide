@@ -4,6 +4,7 @@ import com.travel.planner.account.security.CurrentUser;
 import com.travel.planner.tracking.dto.MomentRequest;
 import com.travel.planner.tracking.dto.MomentResponses.MomentResponse;
 import com.travel.planner.tracking.dto.MomentResponses.MomentSummary;
+import com.travel.planner.tracking.service.GeocodingService;
 import com.travel.planner.tracking.service.PhotoStorageService;
 import com.travel.planner.tracking.service.TrackingService;
 import jakarta.validation.Valid;
@@ -33,6 +34,7 @@ public class TrackingController {
 
     private final TrackingService trackingService;
     private final PhotoStorageService photoStorage;
+    private final GeocodingService geocoding;
     private final CurrentUser currentUser;
 
     /** 통합 기록(사진 포함). data 파트=JSON 필드, photo 파트=이미지(선택). */
@@ -42,14 +44,17 @@ public class TrackingController {
                                  @RequestPart(value = "photo", required = false) MultipartFile photo,
                                  Authentication auth) {
         String photoUrl = photoStorage.store(photo);
-        return trackingService.record(tripId, data, photoUrl, currentUser.requireId(auth));
+        // 역지오코딩은 트랜잭션 밖에서(외부 HTTP 가 DB 커넥션을 점유하지 않도록). 실패 시 null.
+        String place = geocoding.reverse(data.latitude(), data.longitude());
+        return trackingService.record(tripId, data, photoUrl, place, currentUser.requireId(auth));
     }
 
     /** 통합 기록(사진 없음, JSON) — 오프라인 큐 재전송 경로. */
     @PostMapping(path = "/moments", consumes = MediaType.APPLICATION_JSON_VALUE)
     public MomentResponse recordJson(@PathVariable Long tripId,
                                      @Valid @RequestBody MomentRequest data, Authentication auth) {
-        return trackingService.record(tripId, data, null, currentUser.requireId(auth));
+        String place = geocoding.reverse(data.latitude(), data.longitude());
+        return trackingService.record(tripId, data, null, place, currentUser.requireId(auth));
     }
 
     @GetMapping("/moments")

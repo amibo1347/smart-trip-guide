@@ -1,17 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { api } from './api.js'
 import { useI18n } from './i18n/index.jsx'
-
-const TYPE_LABEL = { FLIGHT: ['✈️', '항공'], HOTEL: ['🏨', '숙소'] }
-function typeLabel(t, code) { return TYPE_LABEL[code] ? `${TYPE_LABEL[code][0]} ${t(TYPE_LABEL[code][1])}` : code }
-
-/** 원화 금액의 목적지 통화 환산 문자열 " ( ¥16,200)". 환율 없으면 빈 문자열. */
-function foreign(krw, fx) {
-  if (!fx || fx.code === 'KRW' || !fx.perKrw || krw == null) return ''
-  const v = Number(krw) * Number(fx.perKrw)
-  if (!isFinite(v) || v <= 0) return ''
-  return ` (${fx.symbol}${Math.round(v).toLocaleString()})`
-}
+import { foreign } from './utils/format.js'
+import { BOOKING_TYPE, typeLabel } from './constants/labels.js'
 
 export default function Bookings({ trip, onChanged, onError }) {
   const { t } = useI18n()
@@ -22,7 +13,11 @@ export default function Bookings({ trip, onChanged, onError }) {
   async function load() {
     try { setList(await api.listBookings(trip.id)) } catch (e) { onError(e.message) }
   }
-  useEffect(() => { load() /* eslint-disable-next-line */ }, [trip.id])
+  useEffect(() => {
+    let alive = true
+    api.listBookings(trip.id).then((l) => { if (alive) setList(l) }).catch((e) => onError(e.message))
+    return () => { alive = false }
+  }, [trip.id]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     let alive = true
     api.getCurrency(trip.id).then((c) => { if (alive) setFx(c) }).catch(() => {})
@@ -49,7 +44,7 @@ export default function Bookings({ trip, onChanged, onError }) {
             {b.imageUrl && <img className="bk-img" src={b.imageUrl} alt="" referrerPolicy="no-referrer" />}
             <div className="bk-body">
               <div className="item-main">
-                <span className="type-badge">{typeLabel(t, b.type)}</span>
+                <span className="type-badge">{typeLabel(t, BOOKING_TYPE, b.type)}</span>
                 <b>{b.title}</b>
                 <button className="del" onClick={() => remove(b.id)} title={t('삭제')}>✕</button>
               </div>
@@ -83,6 +78,9 @@ function ImportForm({ trip, onSaved, onError }) {
   const [dragOver, setDragOver] = useState(false)
   const [busy, setBusy] = useState(false)
   const fileRef = useRef(null)
+
+  // 언마운트 시 미리보기 objectURL 해제(누수 방지)
+  useEffect(() => () => { if (photoPreview) URL.revokeObjectURL(photoPreview) }, [photoPreview])
 
   function pickFile(file) {
     if (!file) return

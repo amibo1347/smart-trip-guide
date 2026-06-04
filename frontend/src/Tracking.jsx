@@ -4,20 +4,11 @@ import 'leaflet/dist/leaflet.css'
 import { api } from './api.js'
 import { enqueue, pendingCount, flush } from './offlineQueue.js'
 import { useI18n } from './i18n/index.jsx'
+import { fmtDt, nowLocal, uuid, won } from './utils/format.js'
+import { createMap, pinIcon, popupHtml, DEFAULT_CENTER, DEFAULT_ZOOM, ROUTE_COLOR } from './utils/mapMarkers.js'
 
 const MOODS = ['😀', '😍', '😌', '😐', '😫', '🤩', '🥵', '🌧']
 const CATEGORIES = ['식비', '교통', '숙박', '관광', '기타']
-
-// 로컬 wall-clock "YYYY-MM-DDTHH:mm:ss" (백엔드 LocalDateTime 파싱용, Z 미포함)
-function nowLocal() {
-  const d = new Date()
-  const p = (n) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`
-}
-function uuid() {
-  return (crypto.randomUUID && crypto.randomUUID()) || `${Date.now()}-${Math.random().toString(16).slice(2)}`
-}
-function fmtDt(s) { return s ? s.replace('T', ' ').slice(5, 16) : '' }
 
 export default function Tracking({ trip, onError }) {
   const { t } = useI18n()
@@ -133,7 +124,7 @@ function BudgetAlert({ trip, tick, onError }) {
   const near = !over && ratio >= 80
   const level = over ? 'over' : near ? 'near' : 'ok'
   const fill = Math.min(100, ratio)
-  const won = (v) => `${Number(v ?? 0).toLocaleString()}${t('원')}`
+  const w = (v) => won(v, t('원'))
 
   return (
     <section className={`card budget-alert ${level}`}>
@@ -147,15 +138,15 @@ function BudgetAlert({ trip, tick, onError }) {
         <div className="bar-fill" style={{ width: `${fill}%` }} />
       </div>
       <div className="ba-nums">
-        <span>{t('쓴 금액')} <b>{won(b.liveTotal)}</b></span>
-        <span>{t('한도')} {won(b.budgetLimit)}</span>
+        <span>{t('쓴 금액')} <b>{w(b.liveTotal)}</b></span>
+        <span>{t('한도')} {w(b.budgetLimit)}</span>
       </div>
       <p className="ba-msg">
         {over
-          ? t('한도보다 {amount} 더 썼어요.', { amount: won(b.liveOverAmount) })
-          : `${t('남은 예산')} ${won(b.liveRemaining)}`}
+          ? t('한도보다 {amount} 더 썼어요.', { amount: w(b.liveOverAmount) })
+          : `${t('남은 예산')} ${w(b.liveRemaining)}`}
         {b.actualSpent > 0 && b.bookingTotal > 0 && (
-          <span className="muted small-text"> ({t('예약')} {won(b.bookingTotal)} + {t('지출')} {won(b.actualSpent)})</span>
+          <span className="muted small-text"> ({t('예약')} {w(b.bookingTotal)} + {t('지출')} {w(b.actualSpent)})</span>
         )}
       </p>
     </section>
@@ -181,6 +172,9 @@ function RecordCard({ trip, online, onSaved, onQueued, onError }) {
   const [photo, setPhoto] = useState(null)   // File
   const [preview, setPreview] = useState(null)
   const [busy, setBusy] = useState(false)
+
+  // 미리보기 objectURL 누수 방지: 새 사진/언마운트 시 이전 URL 해제
+  useEffect(() => () => { if (preview) URL.revokeObjectURL(preview) }, [preview])
 
   function pickPhoto(e) {
     const f = e.target.files?.[0] || null
@@ -279,12 +273,9 @@ function MomentMap({ moments }) {
 
   useEffect(() => {
     if (mapRef.current) return
-    const map = L.map(ref.current, { attributionControl: false })
+    const map = createMap(ref.current)
     mapRef.current = map
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 19,
-    }).addTo(map)
-    map.setView([37.5665, 126.978], 11) // 기본: 서울
+    map.setView(DEFAULT_CENTER, DEFAULT_ZOOM)
     return () => { map.remove(); mapRef.current = null }
   }, [])
 
@@ -299,40 +290,13 @@ function MomentMap({ moments }) {
     withLoc.forEach((m) => {
       const p = [Number(m.latitude), Number(m.longitude)]
       pts.push(p)
-      L.marker(p, { icon: pinIcon(m) }).bindPopup(popupHtml(m, t)).addTo(layer)
+      L.marker(p, { icon: pinIcon(m) }).bindPopup(popupHtml(m, t, fmtDt)).addTo(layer)
     })
-    if (pts.length > 1) L.polyline(pts, { color: '#2563eb', weight: 3, opacity: 0.4 }).addTo(layer)
+    if (pts.length > 1) L.polyline(pts, { color: ROUTE_COLOR, weight: 3, opacity: 0.4 }).addTo(layer)
     if (pts.length === 1) map.setView(pts[0], 14)
     else if (pts.length > 1) map.fitBounds(pts, { padding: [40, 40] })
     return () => { layer.remove() }
   }, [moments, t])
 
   return <div ref={ref} className="map" />
-}
-
-function pinIcon(m) {
-  if (m.photoUrl) {
-    return L.divIcon({
-      className: 'photo-pin',
-      html: `<div class="pp-img" style="background-image:url('${m.photoUrl}')"></div><div class="pp-tip"></div>`,
-      iconSize: [50, 58], iconAnchor: [25, 58], popupAnchor: [0, -56],
-    })
-  }
-  return L.divIcon({
-    className: 'photo-pin',
-    html: `<div class="pp-dot">${m.mood || '📍'}</div><div class="pp-tip"></div>`,
-    iconSize: [34, 42], iconAnchor: [17, 42], popupAnchor: [0, -40],
-  })
-}
-
-function popupHtml(m, t) {
-  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))
-  const parts = []
-  if (m.photoUrl) parts.push(`<img src="${m.photoUrl}" style="width:180px;border-radius:8px;display:block;margin-bottom:6px"/>`)
-  parts.push(`<div style="font-size:12px;color:#64748b">🕐 ${fmtDt(m.recordedAt)}</div>`)
-  if (m.place) parts.push(`<div style="font-size:12px;color:#64748b">📍 ${esc(m.place)}</div>`)
-  if (m.mood) parts.push(`<div style="font-size:18px">${m.mood}</div>`)
-  if (m.memo) parts.push(`<div style="margin-top:2px">${esc(m.memo)}</div>`)
-  if (m.amount != null) parts.push(`<div style="margin-top:2px">💰 ${Number(m.amount).toLocaleString()}${t('원')}${m.category ? ` (${esc(t(m.category))})` : ''}</div>`)
-  return `<div style="min-width:140px">${parts.join('')}</div>`
 }

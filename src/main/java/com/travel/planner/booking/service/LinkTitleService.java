@@ -1,7 +1,9 @@
 package com.travel.planner.booking.service;
 
+import com.travel.planner.common.util.Texts;
 import java.net.InetAddress;
 import java.net.URI;
+import org.jsoup.Connection;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
@@ -21,20 +23,13 @@ public class LinkTitleService {
     public String fetchTitle(String rawUrl) {
         URI uri = parseAndValidate(rawUrl);
         try {
-            Document doc = Jsoup.connect(uri.toString())
-                    .userAgent(UA)
-                    .header("Accept-Language", "ko-KR,ko;q=0.9,en;q=0.8")
-                    .referrer("https://www.google.com/")
-                    .timeout(8000)
-                    .followRedirects(true)
-                    .ignoreHttpErrors(true)
-                    .get();
+            Document doc = fetchWithSafeRedirects(uri);
             String title = firstNonBlank(meta(doc, "og:title"), meta(doc, "twitter:title"));
             if (title == null) {
                 title = titleFromUrl(uri);
             }
             if (title == null) {
-                title = blankToNull(doc.title());
+                title = Texts.trimToNull(doc.title());
             }
             if (title == null) {
                 throw new IllegalArgumentException("이름을 가져오지 못했습니다. 직접 입력해 주세요.");
@@ -49,6 +44,34 @@ public class LinkTitleService {
             }
             throw new IllegalArgumentException("이름을 가져오지 못했습니다. 직접 입력해 주세요.");
         }
+    }
+
+    /**
+     * 리디렉션을 수동으로 따라가며 매 홉마다 SSRF 재검증(공개 URL → 내부주소 리디렉션 우회 차단).
+     * Jsoup 의 자동 리디렉션은 재검증을 안 하므로 끄고, Location 을 직접 검증 후 재요청한다.
+     */
+    private Document fetchWithSafeRedirects(URI uri) throws java.io.IOException {
+        for (int hop = 0; hop < 4; hop++) {
+            Connection.Response res = Jsoup.connect(uri.toString())
+                    .userAgent(UA)
+                    .header("Accept-Language", "ko-KR,ko;q=0.9,en;q=0.8")
+                    .referrer("https://www.google.com/")
+                    .timeout(8000)
+                    .followRedirects(false)
+                    .ignoreHttpErrors(true)
+                    .execute();
+            int code = res.statusCode();
+            if (code >= 300 && code < 400) {
+                String loc = res.header("Location");
+                if (loc == null || loc.isBlank()) {
+                    break;
+                }
+                uri = parseAndValidate(uri.resolve(loc).toString()); // 매 홉 재검증
+                continue;
+            }
+            return res.parse();
+        }
+        throw new IllegalArgumentException("리디렉션이 너무 많습니다. 이름을 직접 입력해 주세요.");
     }
 
     /** URL 경로 슬러그에서 숙소/대상 이름 복원. 예) agoda.com/ko-kr/welina-hotel-umeda/hotel/.. → "Welina Hotel Umeda" */
@@ -123,11 +146,7 @@ public class LinkTitleService {
         if (el == null) {
             el = doc.selectFirst("meta[name=\"" + key + "\"]");
         }
-        return el == null ? null : blankToNull(el.attr("content"));
-    }
-
-    private static String blankToNull(String s) {
-        return (s == null || s.isBlank()) ? null : s.trim();
+        return el == null ? null : Texts.trimToNull(el.attr("content"));
     }
 
     private static String firstNonBlank(String a, String b) {

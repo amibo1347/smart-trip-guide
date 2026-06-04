@@ -3,6 +3,7 @@ package com.travel.planner.tracking.service;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -24,14 +25,17 @@ public class GeocodingService {
 
     private final ObjectMapper objectMapper;
 
-    /** 좌표를 행정구역 위주의 짧은 지역명으로 변환. 변환 실패/좌표 없음 시 null. */
+    /** 좌표를 행정구역 위주의 짧은 지역명으로 변환. 좌표 없음/범위 밖/변환 실패 시 null. */
     public String reverse(BigDecimal lat, BigDecimal lon) {
-        if (lat == null || lon == null) {
+        if (!isValidCoord(lat, BigDecimal.valueOf(90)) || !isValidCoord(lon, BigDecimal.valueOf(180))) {
             return null;
         }
         try {
+            // toPlainString: 과학적 표기(1E+2) 방지, 소수 6자리로 절단(불필요한 정밀도/URL 노이즈 제거)
+            String latStr = lat.setScale(6, RoundingMode.HALF_UP).stripTrailingZeros().toPlainString();
+            String lonStr = lon.setScale(6, RoundingMode.HALF_UP).stripTrailingZeros().toPlainString();
             String url = "https://nominatim.openstreetmap.org/reverse?format=jsonv2"
-                    + "&lat=" + lat + "&lon=" + lon + "&zoom=18&accept-language=ko";
+                    + "&lat=" + latStr + "&lon=" + lonStr + "&zoom=18&accept-language=ko";
             String json = Jsoup.connect(url)
                     .userAgent(UA)
                     .header("Accept", "application/json")
@@ -43,6 +47,11 @@ public class GeocodingService {
             log.debug("역지오코딩 실패 ({}, {}): {}", lat, lon, e.toString());
             return null;
         }
+    }
+
+    /** 값이 null 이 아니고 |값| <= limit 인지(위도 90 / 경도 180 범위 검증). */
+    private static boolean isValidCoord(BigDecimal v, BigDecimal limit) {
+        return v != null && v.abs().compareTo(limit) <= 0;
     }
 
     /** 광역→시군구→읍면동(국내) / state→city→suburb(해외) 중 최대 3단계를 공백으로 잇는다(중복 제거). */

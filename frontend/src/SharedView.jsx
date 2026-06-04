@@ -1,23 +1,11 @@
 import { useEffect, useState } from 'react'
 import { api } from './api.js'
 import { useI18n } from './i18n/index.jsx'
+import { fmt, foreign } from './utils/format.js'
+import { PLAN_TYPE, BOOKING_TYPE, typeLabel } from './constants/labels.js'
+import { shareOrCopy } from './utils/clipboard.js'
 
-// [이모지, 이름키] — 이름키는 t()로 현재 언어 표시.
-const TYPE_LABEL = {
-  SPOT: ['🏞', '명소'], MEAL: ['🍽', '식사'], MOVE: ['🚌', '이동'], STAY: ['🏨', '숙박'], ACTIVITY: ['🎯', '액티비티'],
-}
-const BK_LABEL = { FLIGHT: ['✈️', '항공'], HOTEL: ['🏨', '숙소'] }
-function typeLabel(t, map, code) { return map[code] ? `${map[code][0]} ${t(map[code][1])}` : code }
-
-function fmt(t) { return t ? t.slice(0, 5) : '' }
-
-/** 원화 → 목적지 통화 환산 " (≈ ¥16,200)". 환율 없거나 KRW면 빈 문자열. */
-function foreign(krw, fx) {
-  if (!fx || fx.code === 'KRW' || !fx.perKrw || krw == null) return ''
-  const v = Number(krw) * Number(fx.perKrw)
-  if (!isFinite(v) || v <= 0) return ''
-  return ` (≈ ${fx.symbol}${Math.round(v).toLocaleString()})`
-}
+const fx2 = (krw, fx) => foreign(krw, fx, true) // 공유 뷰는 ≈ 표기
 
 /**
  * 로그인 없이 보는 읽기 전용 일정(공유 링크 /share/{token}).
@@ -33,13 +21,12 @@ export default function SharedView({ token }) {
   }, [token])
 
   async function share() {
-    const url = window.location.href
-    if (navigator.share) {
-      try { await navigator.share({ title: data?.title || t('여행 일정'), url }) } catch { /* 취소 무시 */ }
-    } else {
-      try { await navigator.clipboard.writeText(url); alert(t('링크가 복사되었습니다.')) }
-      catch { window.prompt(t('아래 링크를 복사하세요'), url) }
-    }
+    const r = await shareOrCopy({
+      title: data?.title || t('여행 일정'),
+      url: window.location.href,
+      promptMsg: t('아래 링크를 복사하세요'),
+    })
+    if (r === 'copied') alert(t('링크가 복사되었습니다.'))
   }
 
   if (err) {
@@ -95,7 +82,7 @@ export default function SharedView({ token }) {
               return (
                 <li key={it.id}>
                   <div className="item-main">
-                    <span className="type-badge">{typeLabel(t, TYPE_LABEL, it.type)}</span>
+                    <span className="type-badge">{typeLabel(t, PLAN_TYPE, it.type)}</span>
                     <b>{it.title}</b>
                   </div>
                   <div className="item-meta">
@@ -104,12 +91,12 @@ export default function SharedView({ token }) {
                     )}
                     {bk ? (
                       <>
-                        {bk.price != null && <>💰 {Number(bk.price).toLocaleString()}{t('원')}{foreign(bk.price, fx)} </>}
+                        {bk.price != null && <>💰 {Number(bk.price).toLocaleString()}{t('원')}{fx2(bk.price, fx)} </>}
                         <span className="confirm-tag">{t('확정 예약')}</span>{' '}
                       </>
                     ) : (
                       it.estCost != null && Number(it.estCost) > 0 && (
-                        <>💰 {Number(it.estCost).toLocaleString()}{t('원')}{foreign(it.estCost, fx)} </>
+                        <>💰 {Number(it.estCost).toLocaleString()}{t('원')}{fx2(it.estCost, fx)} </>
                       )
                     )}
                     {it.place?.address && <>📍 {it.place.address} </>}
@@ -128,11 +115,11 @@ export default function SharedView({ token }) {
             {data.bookings.map((b) => (
               <li key={b.id}>
                 <div className="item-main">
-                  <span className="type-badge">{typeLabel(t, BK_LABEL, b.type)}</span>
+                  <span className="type-badge">{typeLabel(t, BOOKING_TYPE, b.type)}</span>
                   <b>{b.title}</b>
                 </div>
                 <div className="item-meta">
-                  {b.price != null && <>💰 {Number(b.price).toLocaleString()}{t('원')}{foreign(b.price, fx)} </>}
+                  {b.price != null && <>💰 {Number(b.price).toLocaleString()}{t('원')}{fx2(b.price, fx)} </>}
                   {b.startDate && <>📅 {b.startDate}{b.endDate ? `~${b.endDate}` : ''} </>}
                 </div>
               </li>

@@ -1,6 +1,7 @@
 package com.travel.planner.tracking.service;
 
 import com.travel.planner.common.exception.NotFoundException;
+import com.travel.planner.common.util.Texts;
 import com.travel.planner.tracking.dto.MomentRequest;
 import com.travel.planner.tracking.dto.MomentResponses.MomentResponse;
 import com.travel.planner.tracking.dto.MomentResponses.MomentSummary;
@@ -26,19 +27,20 @@ public class TrackingService {
 
     private final TripMomentRepository momentRepo;
     private final PhotoStorageService photoStorage;
-    private final GeocodingService geocoding;
     private final TripService tripService;
 
+    /**
+     * 통합 기록 저장. place(지역명)는 호출측(컨트롤러)에서 트랜잭션 밖 역지오코딩으로 미리 구해 전달한다
+     * — 외부 HTTP 가 DB 트랜잭션을 점유하지 않도록.
+     */
     @Transactional
-    public MomentResponse record(Long tripId, MomentRequest req, String photoUrl, Long userId) {
+    public MomentResponse record(Long tripId, MomentRequest req, String photoUrl, String place, Long userId) {
         tripService.getOwnedTrip(tripId, userId);
-        // 멱등: 같은 (trip, clientUuid) 재전송이면 기존 레코드 반환(지오코딩 재호출 안 함).
+        // 멱등: 같은 (trip, clientUuid) 재전송이면 기존 레코드 반환.
         TripMoment existing = momentRepo.findByTripIdAndClientUuid(tripId, req.clientUuid()).orElse(null);
         if (existing != null) {
             return MomentResponse.from(existing);
         }
-        // 좌표가 있으면 저장 시점에 지역명으로 변환(실패 시 null → 좌표/생략 폴백).
-        String place = geocoding.reverse(req.latitude(), req.longitude());
         TripMoment saved = momentRepo.save(TripMoment.builder()
                 .tripId(tripId)
                 .clientUuid(req.clientUuid())
@@ -47,10 +49,10 @@ public class TrackingService {
                 .longitude(req.longitude())
                 .accuracyM(req.accuracyM())
                 .place(place)
-                .mood(blankToNull(req.mood()))
+                .mood(Texts.blankToNull(req.mood()))
                 .amount(req.amount())
-                .category(blankToNull(req.category()))
-                .memo(blankToNull(req.memo()))
+                .category(Texts.blankToNull(req.category()))
+                .memo(Texts.blankToNull(req.memo()))
                 .photoUrl(photoUrl)
                 .build());
         return MomentResponse.from(saved);
@@ -85,9 +87,5 @@ public class TrackingService {
             }
         }
         return new MomentSummary(total, byCategory);
-    }
-
-    private static String blankToNull(String s) {
-        return (s == null || s.isBlank()) ? null : s;
     }
 }

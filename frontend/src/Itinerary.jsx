@@ -2,16 +2,11 @@ import { useEffect, useState } from 'react'
 import { api } from './api.js'
 import Bookings from './Bookings.jsx'
 import { useI18n } from './i18n/index.jsx'
+import { fmt, foreign, pct, won } from './utils/format.js'
+import { PLAN_TYPE, typeLabel } from './constants/labels.js'
+import Row from './components/Row.jsx'
 
-// [이모지, 이름키] — 이름키는 t()로 현재 언어 표시.
-const TYPE_LABEL = {
-  SPOT: ['🏞', '명소'],
-  MEAL: ['🍽', '식사'],
-  MOVE: ['🚌', '이동'],
-  STAY: ['🏨', '숙박'],
-  ACTIVITY: ['🎯', '액티비티'],
-}
-function typeLabel(t, code) { return TYPE_LABEL[code] ? `${TYPE_LABEL[code][0]} ${t(TYPE_LABEL[code][1])}` : code }
+const GMAPS_SEARCH = 'https://www.google.com/maps/search/?api=1&query='
 
 export default function Itinerary({ trip, onError }) {
   const { t } = useI18n()
@@ -82,7 +77,7 @@ export default function Itinerary({ trip, onError }) {
                     <button className="rb" disabled={idx === 0} onClick={() => move(it.id, 'UP')} title={t('위로')}>▲</button>
                     <button className="rb" disabled={idx === day.items.length - 1} onClick={() => move(it.id, 'DOWN')} title={t('아래로')}>▼</button>
                   </span>
-                  <span className="type-badge">{typeLabel(t, it.type)}</span>
+                  <span className="type-badge">{typeLabel(t, PLAN_TYPE, it.type)}</span>
                   <b>{it.title}</b>
                   <button className="edit" onClick={() => setEditId(editId === it.id ? null : it.id)} title={t('편집')}>✎</button>
                   <button className="del" onClick={() => removeItem(it.id)} title={t('삭제')}>✕</button>
@@ -170,14 +165,6 @@ function BudgetPanel({ trip, tick, fx, onError }) {
   )
 }
 
-function won(v, unit = '원') { return `${Number(v ?? 0).toLocaleString()}${unit}` }
-function pct(a, b) {
-  const p = Number(b) > 0 ? Math.min(100, (Number(a) / Number(b)) * 100) : 0
-  return `${p}%`
-}
-function Row({ k, v, strong, cls }) {
-  return <div className="brow"><span>{k}</span><b className={cls}>{strong ? <b>{v}</b> : v}</b></div>
-}
 
 function AiGenerate({ trip, plan, onGenerated, onError }) {
   const { t } = useI18n()
@@ -283,20 +270,10 @@ function BookingHelper({ trip, plan, onError }) {
   )
 }
 
-/** 원화 금액의 목적지 통화 환산 문자열 " (¥16,200)". 환율 없으면 빈 문자열. */
-function foreign(krw, fx) {
-  if (!fx || fx.code === 'KRW' || !fx.perKrw || krw == null) return ''
-  const v = Number(krw) * Number(fx.perKrw)
-  if (!isFinite(v) || v <= 0) return ''
-  return ` (${fx.symbol}${Math.round(v).toLocaleString()})`
-}
-
 function mapUrl(item) {
   const q = item.place?.name || item.title
-  return 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(q)
+  return GMAPS_SEARCH + encodeURIComponent(q)
 }
-
-function fmt(t) { return t ? t.slice(0, 5) : '' }
 
 function AddItemForm({ dayId, onAdded, onError }) {
   const { t } = useI18n()
@@ -327,7 +304,7 @@ function AddItemForm({ dayId, onAdded, onError }) {
       <div className="row">
         <label>{t('유형')}
           <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>
-            {Object.keys(TYPE_LABEL).map((v) => <option key={v} value={v}>{typeLabel(t, v)}</option>)}
+            {Object.keys(PLAN_TYPE).map((v) => <option key={v} value={v}>{typeLabel(t, PLAN_TYPE, v)}</option>)}
           </select>
         </label>
         <label style={{ flex: 2 }}>{t('제목')}
