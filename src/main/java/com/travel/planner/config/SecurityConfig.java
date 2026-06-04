@@ -53,7 +53,9 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         // 공개 API: 헬스/로그인 상태/로그인/회원가입
                         .requestMatchers("/api/health", "/api/auth/me", "/api/auth/login").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/shared/**").permitAll() // 읽기 전용 공유(비로그인)
                         .requestMatchers(HttpMethod.POST, "/api/users").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/translate/**").permitAll() // 번역 도우미(사용자 데이터 없음)
                         // 그 외 모든 /api/** 는 로그인 필요
                         .requestMatchers("/api/**").authenticated()
                         // 정적 리소스, /, /oauth2/**, /login/**, /logout 등은 공개

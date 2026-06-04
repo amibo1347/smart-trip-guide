@@ -40,6 +40,10 @@ public class PlanItem extends BaseEntity {
     @JoinColumn(name = "place_id")
     private Place place;
 
+    /** 확정 예약에서 자동 생성된 항목이면 그 예약 id(아니면 null). 예약 삭제 시 정리에 사용. */
+    @Column(name = "booking_id")
+    private Long bookingId;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private PlanItemType type;
@@ -60,9 +64,10 @@ public class PlanItem extends BaseEntity {
     private int sortOrder;
 
     @Builder
-    private PlanItem(Place place, PlanItemType type, String title, LocalTime plannedStart,
+    private PlanItem(Place place, Long bookingId, PlanItemType type, String title, LocalTime plannedStart,
                      LocalTime plannedEnd, BigDecimal estCost, int sortOrder) {
         this.place = place;
+        this.bookingId = bookingId;
         this.type = type;
         this.title = title;
         this.plannedStart = plannedStart;
@@ -77,5 +82,20 @@ public class PlanItem extends BaseEntity {
 
     public void changeSortOrder(int sortOrder) {
         this.sortOrder = sortOrder;
+    }
+
+    /** AI 추정 등으로 예상비용만 갱신. */
+    public void changeEstCost(BigDecimal estCost) {
+        this.estCost = estCost;
+    }
+
+    /** 편집(제목/시간/예상비용). 제목은 비어 있으면 기존 값 유지. */
+    public void update(String title, LocalTime plannedStart, LocalTime plannedEnd, BigDecimal estCost) {
+        if (title != null && !title.isBlank()) {
+            this.title = title;
+        }
+        this.plannedStart = plannedStart;
+        this.plannedEnd = plannedEnd;
+        this.estCost = estCost;
     }
 }

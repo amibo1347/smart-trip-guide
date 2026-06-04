@@ -16,10 +16,8 @@ import com.travel.planner.planning.entity.PlanDay;
 import com.travel.planner.planning.entity.PlanItem;
 import com.travel.planner.planning.repository.PlanItemRepository;
 import com.travel.planner.planning.repository.PlanRepository;
-import com.travel.planner.tracking.entity.Expense;
-import com.travel.planner.tracking.repository.ExpenseRepository;
-import com.travel.planner.tracking.repository.LocationLogRepository;
-import com.travel.planner.tracking.repository.MoodLogRepository;
+import com.travel.planner.tracking.entity.TripMoment;
+import com.travel.planner.tracking.repository.TripMomentRepository;
 import com.travel.planner.trip.entity.Trip;
 import com.travel.planner.trip.service.TripService;
 import java.math.BigDecimal;
@@ -44,21 +42,21 @@ public class ReviewService {
     private final PlanItemRepository planItemRepository;
     private final PlanItemActualRepository actualRepository;
     private final TripFeedbackRepository feedbackRepository;
-    private final ExpenseRepository expenseRepository;
-    private final LocationLogRepository locationRepository;
-    private final MoodLogRepository moodRepository;
+    private final TripMomentRepository momentRepository;
 
     public ReviewResponse getReview(Long tripId, Long userId) {
         Trip trip = tripService.getOwnedTrip(tripId, userId);
 
-        // 지출 집계
-        List<Expense> expenses = expenseRepository.findByTripIdOrderBySpentAtDesc(tripId);
+        // 통합 기록 집계(지출/위치/기분을 한 테이블에서)
+        List<TripMoment> moments = momentRepository.findByTripIdOrderByRecordedAtDesc(tripId);
         BigDecimal actualSpent = BigDecimal.ZERO;
         Map<String, BigDecimal> byCategory = new LinkedHashMap<>();
-        for (Expense e : expenses) {
-            actualSpent = actualSpent.add(e.getAmount());
-            String cat = e.getCategory() == null ? "기타" : e.getCategory();
-            byCategory.merge(cat, e.getAmount(), BigDecimal::add);
+        for (TripMoment m : moments) {
+            if (m.getAmount() != null) {
+                actualSpent = actualSpent.add(m.getAmount());
+                String cat = m.getCategory() == null ? "기타" : m.getCategory();
+                byCategory.merge(cat, m.getAmount(), BigDecimal::add);
+            }
         }
 
         // 계획 항목 + 실제(visited/cost/satisfaction)
@@ -97,11 +95,13 @@ public class ReviewService {
             }
         }
 
-        // 위치 포인트 (지도용)
-        List<LocationPoint> locations = locationRepository.findByTripIdOrderByRecordedAtDesc(tripId).stream()
-                .map(l -> new LocationPoint(l.getLatitude(), l.getLongitude(), l.getRecordedAt()))
+        // 위치 포인트 (지도용) — 좌표가 있는 기록만. 사진/기분/메모/금액도 함께 실어 지도 일기로.
+        List<LocationPoint> locations = moments.stream()
+                .filter(m -> m.getLatitude() != null && m.getLongitude() != null)
+                .map(m -> new LocationPoint(m.getLatitude(), m.getLongitude(), m.getRecordedAt(),
+                        m.getMood(), m.getAmount(), m.getMemo(), m.getPhotoUrl()))
                 .toList();
-        int moodCount = moodRepository.findByTripIdOrderByRecordedAtDesc(tripId).size();
+        int moodCount = (int) moments.stream().filter(m -> m.getMood() != null).count();
 
         BigDecimal budgetDiff = trip.getBudgetLimit() == null ? null
                 : trip.getBudgetLimit().subtract(actualSpent);
@@ -132,8 +132,9 @@ public class ReviewService {
     public FeedbackView upsertFeedback(Long tripId, FeedbackUpsertRequest req, Long userId) {
         Trip trip = tripService.getOwnedTrip(tripId, userId);
 
-        BigDecimal actualSpent = expenseRepository.findByTripIdOrderBySpentAtDesc(tripId).stream()
-                .map(Expense::getAmount)
+        BigDecimal actualSpent = momentRepository.findByTripIdOrderByRecordedAtDesc(tripId).stream()
+                .map(TripMoment::getAmount)
+                .filter(java.util.Objects::nonNull)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         BigDecimal budgetDiff = trip.getBudgetLimit() == null ? null
                 : trip.getBudgetLimit().subtract(actualSpent);

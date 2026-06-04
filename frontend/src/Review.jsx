@@ -2,10 +2,12 @@ import { useEffect, useRef, useState } from 'react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { api } from './api.js'
+import { useI18n } from './i18n/index.jsx'
 
 const TYPE_LABEL = { SPOT: '명소', MEAL: '식사', MOVE: '이동', STAY: '숙박', ACTIVITY: '액티비티' }
 
 export default function Review({ trip, onError }) {
+  const { t } = useI18n()
   const [review, setReview] = useState(null)
 
   async function load() {
@@ -13,7 +15,7 @@ export default function Review({ trip, onError }) {
   }
   useEffect(() => { load() /* eslint-disable-next-line */ }, [trip.id])
 
-  if (!review) return <p className="muted">복기 정보를 불러오는 중...</p>
+  if (!review) return <p className="muted">{t('복기 정보를 불러오는 중...')}</p>
 
   const { budgetLimit, plannedCostTotal, actualSpent, budgetDiff,
           expenseByCategory, locationCount, moodCount, visitedCount, totalItems,
@@ -23,23 +25,23 @@ export default function Review({ trip, onError }) {
     <div>
       {/* 요약 */}
       <section className="card">
-        <h3>📊 한눈에 보기</h3>
+        <h3>📊 {t('한눈에 보기')}</h3>
         <div className="stat-grid">
-          <Stat label="방문" value={`${visitedCount}/${totalItems}`} />
-          <Stat label="기록 위치" value={locationCount} />
-          <Stat label="기분 기록" value={moodCount} />
+          <Stat label={t('방문')} value={`${visitedCount}/${totalItems}`} />
+          <Stat label={t('기록 위치')} value={locationCount} />
+          <Stat label={t('기분 기록')} value={moodCount} />
         </div>
       </section>
 
       {/* 예산 vs 실제 */}
       <section className="card">
-        <h3>💰 예산 vs 실제</h3>
+        <h3>💰 {t('예산 vs 실제')}</h3>
         <div className="budget">
-          <Row k="예산 한도" v={budgetLimit != null ? won(budgetLimit) : '미설정'} />
-          <Row k="계획 예상비용" v={won(plannedCostTotal)} />
-          <Row k="실제 지출" v={won(actualSpent)} strong />
+          <Row k={t('예산 한도')} v={budgetLimit != null ? won(budgetLimit, t('원')) : t('미설정')} />
+          <Row k={t('계획 예상비용')} v={won(plannedCostTotal, t('원'))} />
+          <Row k={t('실제 지출')} v={won(actualSpent, t('원'))} strong />
           {budgetDiff != null && (
-            <Row k="예산 대비" v={`${budgetDiff >= 0 ? '+' : ''}${won(budgetDiff)} (${budgetDiff >= 0 ? '절약' : '초과'})`}
+            <Row k={t('예산 대비')} v={`${budgetDiff >= 0 ? '+' : ''}${won(budgetDiff, t('원'))} (${budgetDiff >= 0 ? t('절약') : t('초과')})`}
                  cls={budgetDiff >= 0 ? 'good' : 'bad'} />
           )}
         </div>
@@ -50,23 +52,23 @@ export default function Review({ trip, onError }) {
         )}
         <div className="bycat">
           {Object.entries(expenseByCategory).map(([c, v]) => (
-            <span key={c} className="catchip">{c} {won(v)}</span>
+            <span key={c} className="catchip">{c} {won(v, t('원'))}</span>
           ))}
         </div>
       </section>
 
       {/* 지도 */}
       <section className="card">
-        <h3>🗺 이동 경로 ({locationCount})</h3>
+        <h3>🗺 {t('이동 경로')} ({locationCount})</h3>
         {locations.length === 0
-          ? <p className="muted small-text">기록된 위치가 없습니다. ‘기록’ 탭에서 위치를 남겨보세요.</p>
+          ? <p className="muted small-text">{t('기록된 위치가 없습니다. ‘기록’ 탭에서 위치를 남겨보세요.')}</p>
           : <MapView locations={locations} />}
       </section>
 
       {/* 계획 vs 실제 */}
       <section className="card">
-        <h3>✅ 계획 vs 실제</h3>
-        {items.length === 0 && <p className="muted small-text">일정이 없습니다.</p>}
+        <h3>✅ {t('계획 vs 실제')}</h3>
+        {items.length === 0 && <p className="muted small-text">{t('일정이 없습니다.')}</p>}
         <ul className="items">
           {items.map((it) => (
             <ActualRow key={it.planItemId} item={it} onSaved={load} onError={onError} />
@@ -80,7 +82,7 @@ export default function Review({ trip, onError }) {
   )
 }
 
-function won(v) { return `${Number(v).toLocaleString()}원` }
+function won(v, unit = '원') { return `${Number(v).toLocaleString()}${unit}` }
 function pct(a, b) {
   const p = Number(b) > 0 ? Math.min(100, (Number(a) / Number(b)) * 100) : 0
   return `${p}%`
@@ -94,36 +96,66 @@ function Row({ k, v, strong, cls }) {
 }
 
 function MapView({ locations }) {
+  const { t } = useI18n()
   const ref = useRef(null)
   const mapRef = useRef(null)
 
   useEffect(() => {
     if (mapRef.current) return
-    const map = L.map(ref.current)
+    const map = L.map(ref.current, { attributionControl: false })
     mapRef.current = map
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '© OpenStreetMap', maxZoom: 19,
+      maxZoom: 19,
     }).addTo(map)
 
-    // 시간순(오래된→최신)으로 마커 + 경로
-    const pts = [...locations].reverse().map((l) => [Number(l.latitude), Number(l.longitude)])
-    pts.forEach((p, i) => {
-      L.circleMarker(p, { radius: 6, color: '#2563eb', fillColor: '#2563eb', fillOpacity: 0.8 })
-        .bindPopup(`${i + 1}번째 기록`).addTo(map)
+    // 시간순(오래된→최신)으로 사진 핀 + 경로
+    const ordered = [...locations].reverse()
+    const pts = ordered.map((l) => [Number(l.latitude), Number(l.longitude)])
+    ordered.forEach((l, i) => {
+      L.marker(pts[i], { icon: pinIcon(l) }).bindPopup(popupHtml(l, t)).addTo(map)
     })
     if (pts.length > 1) {
       L.polyline(pts, { color: '#2563eb', weight: 3, opacity: 0.5 }).addTo(map)
     }
     if (pts.length === 1) map.setView(pts[0], 14)
-    else map.fitBounds(pts, { padding: [30, 30] })
+    else if (pts.length > 1) map.fitBounds(pts, { padding: [30, 30] })
 
     return () => { map.remove(); mapRef.current = null }
-  }, [locations])
+  }, [locations, t])
 
   return <div ref={ref} className="map" />
 }
 
+function fmtDt(s) { return s ? s.replace('T', ' ').slice(5, 16) : '' }
+
+function pinIcon(l) {
+  if (l.photoUrl) {
+    return L.divIcon({
+      className: 'photo-pin',
+      html: `<div class="pp-img" style="background-image:url('${l.photoUrl}')"></div><div class="pp-tip"></div>`,
+      iconSize: [50, 58], iconAnchor: [25, 58], popupAnchor: [0, -56],
+    })
+  }
+  return L.divIcon({
+    className: 'photo-pin',
+    html: `<div class="pp-dot">${l.mood || '📍'}</div><div class="pp-tip"></div>`,
+    iconSize: [34, 42], iconAnchor: [17, 42], popupAnchor: [0, -40],
+  })
+}
+
+function popupHtml(l, t) {
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))
+  const parts = []
+  if (l.photoUrl) parts.push(`<img src="${l.photoUrl}" style="width:180px;border-radius:8px;display:block;margin-bottom:6px"/>`)
+  parts.push(`<div style="font-size:12px;color:#64748b">🕐 ${fmtDt(l.recordedAt)}</div>`)
+  if (l.mood) parts.push(`<div style="font-size:18px">${l.mood}</div>`)
+  if (l.memo) parts.push(`<div style="margin-top:2px">${esc(l.memo)}</div>`)
+  if (l.amount != null) parts.push(`<div style="margin-top:2px">💰 ${Number(l.amount).toLocaleString()}${t('원')}</div>`)
+  return `<div style="min-width:140px">${parts.join('')}</div>`
+}
+
 function ActualRow({ item, onSaved, onError }) {
+  const { t } = useI18n()
   const [visited, setVisited] = useState(item.visited)
   const [satisfaction, setSatisfaction] = useState(item.satisfaction ?? 0)
   const [actualCost, setActualCost] = useState(item.actualCost ?? '')
@@ -148,13 +180,13 @@ function ActualRow({ item, onSaved, onError }) {
         <label className="chk">
           <input type="checkbox" checked={visited} disabled={busy}
                  onChange={(e) => { setVisited(e.target.checked); save({ visited: e.target.checked }) }} />
-          방문
+          {t('방문')}
         </label>
-        <span className="type-badge">{TYPE_LABEL[item.type] ?? item.type}</span>
-        <b className={visited ? '' : 'muted'}>{item.dayNo}일차 · {item.title}</b>
+        <span className="type-badge">{t(TYPE_LABEL[item.type] ?? item.type)}</span>
+        <b className={visited ? '' : 'muted'}>{t('{n}일차', { n: item.dayNo })} · {item.title}</b>
       </div>
       <div className="item-meta actual-row">
-        <span>만족도
+        <span>{t('만족도')}
           <span className="stars">
             {[1, 2, 3, 4, 5].map((n) => (
               <button key={n} className={'star' + (n <= satisfaction ? ' on' : '')}
@@ -162,10 +194,10 @@ function ActualRow({ item, onSaved, onError }) {
             ))}
           </span>
         </span>
-        <span>실제비용
+        <span>{t('실제비용')}
           <input type="number" min="0" className="cost-in" value={actualCost} placeholder={item.estCost ?? '0'}
                  onChange={(e) => setActualCost(e.target.value)}
-                 onBlur={(e) => save({ actualCost: e.target.value })} />원
+                 onBlur={(e) => save({ actualCost: e.target.value })} />{t('원')}
         </span>
       </div>
     </li>
@@ -173,6 +205,7 @@ function ActualRow({ item, onSaved, onError }) {
 }
 
 function FeedbackCard({ trip, feedback, onSaved, onError }) {
+  const { t } = useI18n()
   const [score, setScore] = useState(feedback?.overallScore ?? 0)
   const [comment, setComment] = useState(feedback?.comment ?? '')
   const [busy, setBusy] = useState(false)
@@ -182,27 +215,27 @@ function FeedbackCard({ trip, feedback, onSaved, onError }) {
     setBusy(true); setSavedMsg('')
     try {
       await api.saveFeedback(trip.id, { overallScore: score || null, comment: comment || null })
-      setSavedMsg('저장됨 ✓')
+      setSavedMsg(t('저장됨 ✓'))
       onSaved()
     } catch (e) { onError(e.message) } finally { setBusy(false) }
   }
 
   return (
     <section className="card">
-      <h3>📝 여행 회고</h3>
-      <div className="brow"><span>전체 만족도</span>
+      <h3>📝 {t('여행 일기')}</h3>
+      <div className="brow"><span>{t('전체 만족도')}</span>
         <span className="stars">
           {[1, 2, 3, 4, 5].map((n) => (
             <button key={n} className={'star' + (n <= score ? ' on' : '')} onClick={() => setScore(n)}>★</button>
           ))}
         </span>
       </div>
-      <textarea className="ta" rows="3" placeholder="이번 여행은 어땠나요?" value={comment}
+      <textarea className="ta" rows="3" placeholder={t('이번 여행은 어땠나요?')} value={comment}
                 onChange={(e) => setComment(e.target.value)} />
-      <button disabled={busy} onClick={save}>{busy ? '저장 중...' : '회고 저장'}</button>
+      <button disabled={busy} onClick={save}>{busy ? t('저장 중...') : t(' 일기 기록')}</button>
       {savedMsg && <span className="saved">{savedMsg}</span>}
       {feedback?.budgetDiff != null && (
-        <p className="muted small-text">예산 대비: {Number(feedback.budgetDiff).toLocaleString()}원</p>
+        <p className="muted small-text">{t('예산 대비')}: {Number(feedback.budgetDiff).toLocaleString()}{t('원')}</p>
       )}
     </section>
   )

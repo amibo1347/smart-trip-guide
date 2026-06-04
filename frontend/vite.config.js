@@ -25,7 +25,9 @@ export default defineConfig({
           { src: 'icons/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' }
         ]
       },
-      devOptions: { enabled: true }
+      // 개발 중에는 서비스워커 비활성(캐시 때문에 코드 변경이 화면에 안 보이는 문제 방지).
+      // 운영 빌드(npm run build)에서는 PWA/SW가 정상 동작한다.
+      devOptions: { enabled: false }
     })
   ],
   server: {
@@ -33,6 +35,7 @@ export default defineConfig({
     // dev 중 /api·OAuth 경로를 백엔드(8082)로 프록시 → CORS 없이 동작
     proxy: {
       '/api': { target: BACKEND, changeOrigin: true },
+      '/uploads': { target: BACKEND, changeOrigin: true }, // 기록 사진(서버 로컬 파일) 정적 서빙
       '/oauth2': { target: BACKEND, changeOrigin: true },
       '/login': { target: BACKEND, changeOrigin: true },
       '/logout': { target: BACKEND, changeOrigin: true }

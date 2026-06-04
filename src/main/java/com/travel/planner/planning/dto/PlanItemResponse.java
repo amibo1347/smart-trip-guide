@@ -13,12 +13,14 @@ public record PlanItemResponse(
         LocalTime plannedEnd,
         BigDecimal estCost,
         int sortOrder,
+        Long bookingId,
         PlaceResponse place
 ) {
     public static PlanItemResponse from(PlanItem i) {
         return new PlanItemResponse(
                 i.getId(), i.getType(), i.getTitle(),
                 i.getPlannedStart(), i.getPlannedEnd(), i.getEstCost(), i.getSortOrder(),
+                i.getBookingId(),
                 PlaceResponse.from(i.getPlace()));
     }
 }

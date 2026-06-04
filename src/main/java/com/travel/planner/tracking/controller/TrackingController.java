@@ -1,71 +1,71 @@
 package com.travel.planner.tracking.controller;
 
-import com.travel.planner.tracking.dto.ExpenseRequest;
-import com.travel.planner.tracking.dto.LocationRequest;
-import com.travel.planner.tracking.dto.MoodRequest;
-import com.travel.planner.tracking.dto.TrackingResponses.ExpenseResponse;
-import com.travel.planner.tracking.dto.TrackingResponses.ExpenseSummary;
-import com.travel.planner.tracking.dto.TrackingResponses.LocationResponse;
-import com.travel.planner.tracking.dto.TrackingResponses.MoodResponse;
 import com.travel.planner.account.security.CurrentUser;
+import com.travel.planner.tracking.dto.MomentRequest;
+import com.travel.planner.tracking.dto.MomentResponses.MomentResponse;
+import com.travel.planner.tracking.dto.MomentResponses.MomentSummary;
+import com.travel.planner.tracking.service.PhotoStorageService;
 import com.travel.planner.tracking.service.TrackingService;
 import jakarta.validation.Valid;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestPart;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
+/**
+ * 여행 중 통합 기록 API. 사진 포함은 multipart, 사진 없는 빠른 기록은 JSON(오프라인 큐 재전송 호환).
+ */
 @RestController
 @RequestMapping("/api/trips/{tripId}")
 @RequiredArgsConstructor
 public class TrackingController {
 
     private final TrackingService trackingService;
+    private final PhotoStorageService photoStorage;
     private final CurrentUser currentUser;
 
-    // ── 위치 ──
-    @PostMapping("/locations")
-    public LocationResponse recordLocation(@PathVariable Long tripId,
-                                           @Valid @RequestBody LocationRequest req, Authentication auth) {
-        return trackingService.recordLocation(tripId, req, currentUser.requireId(auth));
+    /** 통합 기록(사진 포함). data 파트=JSON 필드, photo 파트=이미지(선택). */
+    @PostMapping(path = "/moments", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public MomentResponse record(@PathVariable Long tripId,
+                                 @RequestPart("data") @Valid MomentRequest data,
+                                 @RequestPart(value = "photo", required = false) MultipartFile photo,
+                                 Authentication auth) {
+        String photoUrl = photoStorage.store(photo);
+        return trackingService.record(tripId, data, photoUrl, currentUser.requireId(auth));
     }
 
-    @GetMapping("/locations")
-    public List<LocationResponse> listLocations(@PathVariable Long tripId, Authentication auth) {
-        return trackingService.listLocations(tripId, currentUser.requireId(auth));
+    /** 통합 기록(사진 없음, JSON) — 오프라인 큐 재전송 경로. */
+    @PostMapping(path = "/moments", consumes = MediaType.APPLICATION_JSON_VALUE)
+    public MomentResponse recordJson(@PathVariable Long tripId,
+                                     @Valid @RequestBody MomentRequest data, Authentication auth) {
+        return trackingService.record(tripId, data, null, currentUser.requireId(auth));
     }
 
-    // ── 기분 ──
-    @PostMapping("/moods")
-    public MoodResponse recordMood(@PathVariable Long tripId,
-                                   @Valid @RequestBody MoodRequest req, Authentication auth) {
-        return trackingService.recordMood(tripId, req, currentUser.requireId(auth));
+    @GetMapping("/moments")
+    public List<MomentResponse> list(@PathVariable Long tripId, Authentication auth) {
+        return trackingService.list(tripId, currentUser.requireId(auth));
     }
 
-    @GetMapping("/moods")
-    public List<MoodResponse> listMoods(@PathVariable Long tripId, Authentication auth) {
-        return trackingService.listMoods(tripId, currentUser.requireId(auth));
+    @GetMapping("/moments/summary")
+    public MomentSummary summary(@PathVariable Long tripId, Authentication auth) {
+        return trackingService.summary(tripId, currentUser.requireId(auth));
     }
 
-    // ── 지출 ──
-    @PostMapping("/expenses")
-    public ExpenseResponse recordExpense(@PathVariable Long tripId,
-                                         @Valid @RequestBody ExpenseRequest req, Authentication auth) {
-        return trackingService.recordExpense(tripId, req, currentUser.requireId(auth));
-    }
-
-    @GetMapping("/expenses")
-    public List<ExpenseResponse> listExpenses(@PathVariable Long tripId, Authentication auth) {
-        return trackingService.listExpenses(tripId, currentUser.requireId(auth));
-    }
-
-    @GetMapping("/expenses/summary")
-    public ExpenseSummary expenseSummary(@PathVariable Long tripId, Authentication auth) {
-        return trackingService.expenseSummary(tripId, currentUser.requireId(auth));
+    /** 기록 완전 삭제. */
+    @DeleteMapping("/moments/{momentId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void delete(@PathVariable Long tripId, @PathVariable Long momentId, Authentication auth) {
+        trackingService.delete(momentId, currentUser.requireId(auth));
     }
 }

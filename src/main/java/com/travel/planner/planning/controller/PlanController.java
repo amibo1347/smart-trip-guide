@@ -7,6 +7,7 @@ import com.travel.planner.planning.dto.AddPlanItemRequest;
 import com.travel.planner.planning.dto.BookingLinksResponse;
 import com.travel.planner.planning.dto.GeneratePlanRequest;
 import com.travel.planner.planning.dto.PlanResponse;
+import com.travel.planner.planning.dto.UpdatePlanItemRequest;
 import com.travel.planner.planning.service.AccommodationService;
 import com.travel.planner.planning.service.AiPlanService;
 import com.travel.planner.planning.service.BookingLinkService;
@@ -66,6 +67,14 @@ public class PlanController {
                                 @Valid @RequestBody AddPlanItemRequest request,
                                 Authentication auth) {
         return planService.addItem(dayId, request, currentUser.requireId(auth));
+    }
+
+    /** 일정 항목 편집(제목/시간/예상비용). */
+    @PatchMapping("/api/plan-items/{itemId}")
+    public PlanResponse updateItem(@PathVariable Long itemId,
+                                   @Valid @RequestBody UpdatePlanItemRequest request,
+                                   Authentication auth) {
+        return planService.updateItem(itemId, request, currentUser.requireId(auth));
     }
 
     /** 일정 항목 삭제. */

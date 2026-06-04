@@ -1,0 +1,32 @@
+# =====================================================================
+# 운영 프로파일. 활성화: SPRING_PROFILES_ACTIVE=prod
+# 기본(application.yml)은 개발 편의를 위해 SQL/JDBC 디버그 로깅이 켜져 있다.
+# 운영에서는 성능·보안(쿼리·파라미터 노출 방지)을 위해 이를 끄고 로그 레벨을 낮춘다.
+# (DB·키 등 비밀값은 동일하게 환경변수로 주입 — 여기엔 비밀값을 두지 않는다.)
+# =====================================================================
+
+spring:
+  jpa:
+    properties:
+      hibernate:
+        format_sql: false   # SQL 콘솔 정렬 출력 off
+
+  # 잘못된 요청에 내부 정보(스택트레이스/예외 메시지) 노출 방지
+  mvc:
+    log-resolved-exception: false
+
+server:
+  error:
+    include-message: never
+    include-stacktrace: never
+    include-binding-errors: never
+    include-exception: false
+
+logging:
+  level:
+    root: info
+    com.travel.planner: info
+    org.hibernate.SQL: warn          # 기본(application.yml)의 debug 를 덮어씀
+    org.hibernate.orm.jdbc.bind: warn
+    org.springframework.jdbc.core: warn
+    org.springframework.web: warn

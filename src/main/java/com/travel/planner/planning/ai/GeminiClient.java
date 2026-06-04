@@ -46,22 +46,68 @@ public class GeminiClient {
     /**
      * 프롬프트 + 응답 스키마로 구조화 JSON 생성. 반환 = 모델이 만든 JSON 문자열.
      */
-    @SuppressWarnings("unchecked")
     public String generateJson(String prompt, Map<String, Object> responseSchema) {
-        if (!isAvailable()) {
-            throw new AiException("AI 키가 설정되지 않았습니다. .env 의 GEMINI_API_KEY 를 설정한 뒤 다시 시도하세요.");
-        }
-
         Map<String, Object> genCfg = new HashMap<>();
         genCfg.put("temperature", 0.8);
         genCfg.put("responseMimeType", "application/json");
         if (responseSchema != null) {
             genCfg.put("responseSchema", responseSchema);
         }
-        Map<String, Object> body = Map.of(
-                "contents", List.of(Map.of("parts", List.of(Map.of("text", prompt)))),
-                "generationConfig", genCfg);
+        String text = call(List.of(textPart(prompt)), genCfg);
+        if (text.isBlank()) {
+            throw new AiException("Gemini가 일정 JSON을 반환하지 않았습니다.");
+        }
+        return text;
+    }
 
+    /** 평문(번역 등) 텍스트 생성. 번역은 보수적으로(temperature 낮게). */
+    public String generateText(String prompt) {
+        String text = call(List.of(textPart(prompt)), lowTempCfg());
+        if (text.isBlank()) {
+            throw new AiException("Gemini가 결과를 반환하지 않았습니다.");
+        }
+        return text;
+    }
+
+    /** 이미지 + 프롬프트(멀티모달) 평문 생성. OCR·이미지 번역에 사용. base64 = 원본 바이트의 Base64. */
+    public String generateTextFromImage(String prompt, String base64, String mimeType) {
+        String text = call(List.of(imagePart(base64, mimeType), textPart(prompt)), lowTempCfg());
+        if (text.isBlank()) {
+            throw new AiException("Gemini가 이미지에서 텍스트를 추출하지 못했습니다.");
+        }
+        return text;
+    }
+
+    private static Map<String, Object> lowTempCfg() {
+        Map<String, Object> cfg = new HashMap<>();
+        cfg.put("temperature", 0.2);
+        return cfg;
+    }
+
+    private static Map<String, Object> textPart(String text) {
+        Map<String, Object> m = new HashMap<>();
+        m.put("text", text);
+        return m;
+    }
+
+    private static Map<String, Object> imagePart(String base64, String mimeType) {
+        Map<String, Object> inline = new HashMap<>();
+        inline.put("mime_type", mimeType);
+        inline.put("data", base64);
+        Map<String, Object> m = new HashMap<>();
+        m.put("inline_data", inline);
+        return m;
+    }
+
+    /** 공통 호출: parts + generationConfig 로 1회 생성하고 응답 텍스트를 이어붙여 반환(빈 문자열일 수 있음). */
+    @SuppressWarnings("unchecked")
+    private String call(List<Map<String, Object>> parts, Map<String, Object> genCfg) {
+        if (!isAvailable()) {
+            throw new AiException("AI 키가 설정되지 않았습니다. .env 의 GEMINI_API_KEY 를 설정한 뒤 다시 시도하세요.");
+        }
+        Map<String, Object> body = Map.of(
+                "contents", List.of(Map.of("parts", parts)),
+                "generationConfig", genCfg);
         String url = "/models/" + model + ":generateContent?key=" + apiKey;
 
         // 503/504/429 일시 장애 시 최대 2회 재시도
@@ -103,7 +149,7 @@ public class GeminiClient {
             throw new AiException("Gemini 호출 실패 (HTTP " + code + ")" + detail, lastError);
         }
 
-        // candidates[0].content.parts[0].text
+        // candidates[0].content.parts[*].text
         List<Map<String, Object>> candidates = (List<Map<String, Object>>) resp.get("candidates");
         if (candidates == null || candidates.isEmpty()) {
             throw new AiException("Gemini 응답이 비어 있습니다.");
@@ -112,18 +158,15 @@ public class GeminiClient {
         if (content == null) {
             throw new AiException("Gemini 응답에 content가 없습니다(안전필터 등).");
         }
-        List<Map<String, Object>> parts = (List<Map<String, Object>>) content.get("parts");
+        List<Map<String, Object>> respParts = (List<Map<String, Object>>) content.get("parts");
         StringBuilder sb = new StringBuilder();
-        if (parts != null) {
-            for (Map<String, Object> p : parts) {
+        if (respParts != null) {
+            for (Map<String, Object> p : respParts) {
                 Object t = p.get("text");
                 if (t != null) {
                     sb.append(t);
                 }
             }
-        }
-        if (sb.length() == 0) {
-            throw new AiException("Gemini가 일정 JSON을 반환하지 않았습니다.");
         }
         return sb.toString();
     }

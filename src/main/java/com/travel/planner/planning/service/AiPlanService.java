@@ -13,6 +13,9 @@ import com.travel.planner.planning.entity.Plan;
 import com.travel.planner.planning.entity.PlanDay;
 import com.travel.planner.planning.entity.PlanItem;
 import com.travel.planner.planning.entity.PlanItemType;
+import com.travel.planner.booking.entity.BookingType;
+import com.travel.planner.booking.entity.TripBooking;
+import com.travel.planner.booking.repository.TripBookingRepository;
 import com.travel.planner.planning.repository.PlaceRepository;
 import com.travel.planner.planning.repository.PlanRepository;
 import com.travel.planner.trip.entity.Trip;
@@ -21,6 +24,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -41,6 +45,8 @@ public class AiPlanService {
     private final TripService tripService;
     private final PlanRepository planRepository;
     private final PlaceRepository placeRepository;
+    private final TripBookingRepository bookingRepository;
+    private final PlanService planService;
     private final ObjectMapper objectMapper;
 
     private static final Map<String, Object> ITEM_SCHEMA = Map.of(
@@ -55,6 +61,18 @@ public class AiPlanService {
                     "placeName", Map.of("type", "STRING"),
                     "address", Map.of("type", "STRING"))),
             "required", List.of("type", "title"));
+
+    /** 비용 추정 응답 스키마: { estimates:[{ id, estCost }] } */
+    private static final Map<String, Object> COST_SCHEMA = Map.of(
+            "type", "OBJECT",
+            "properties", Map.of(
+                    "estimates", Map.of("type", "ARRAY", "items", Map.of(
+                            "type", "OBJECT",
+                            "properties", new LinkedHashMap<>(Map.of(
+                                    "id", Map.of("type", "INTEGER"),
+                                    "estCost", Map.of("type", "NUMBER"))),
+                            "required", List.of("id", "estCost")))),
+            "required", List.of("estimates"));
 
     /** Gemini 응답 스키마: { destinationCity, days:[{ dayNo, items:[...] }] } */
     private static final Map<String, Object> SCHEMA = Map.of(
@@ -74,7 +92,10 @@ public class AiPlanService {
         Trip trip = tripService.getOwnedTrip(tripId, userId);
         long days = ChronoUnit.DAYS.between(trip.getStartDate(), trip.getEndDate()) + 1;
 
-        String prompt = buildPrompt(trip, days, req);
+        // 확정 예약(항공/숙소) — AI가 이를 전제로 일정을 짜도록 프롬프트에 반영
+        List<TripBooking> bookings = bookingRepository.findByTripIdOrderByTypeAscIdAsc(tripId);
+
+        String prompt = buildPrompt(trip, days, req, bookings);
         String json = gemini.generateJson(prompt, SCHEMA);
 
         JsonNode root;
@@ -125,7 +146,93 @@ public class AiPlanService {
             }
         }
 
-        return PlanResponse.from(planRepository.save(plan));
+        Plan saved = planRepository.save(plan);
+        fillMissingCosts(trip, saved); // 생성 직후, 비용이 비어 있는 항목은 AI 추정으로 자동 보강
+
+        // 확정 예약을 새 플랜에도 항목으로 반영(호텔 체크인/항공 출발 등). AI 항목과 중복되지 않도록
+        // 프롬프트에서 AI가 항공/숙소 항목을 따로 만들지 않게 지시했다.
+        for (TripBooking b : bookings) {
+            planService.addBookingItems(tripId, userId, b.getId(),
+                    b.getType() == BookingType.HOTEL, b.getTitle(), b.getStartDate(), b.getEndDate());
+        }
+        return PlanResponse.from(saved);
+    }
+
+    /**
+     * 일정의 식사/명소/액티비티 항목 중 '비용이 비어 있는(null·0)' 것들의 1인 예상비용을
+     * AI로 한 번에 추정해 채운다(직접 입력값 보존). 생성 흐름의 보조 단계 —
+     * 실패해도 일정 생성 자체는 유지되도록 예외를 삼킨다.
+     */
+    private void fillMissingCosts(Trip trip, Plan plan) {
+        List<PlanItem> targets = new ArrayList<>();
+        for (PlanDay day : plan.getDays()) {
+            for (PlanItem it : day.getItems()) {
+                boolean costly = it.getType() == PlanItemType.MEAL
+                        || it.getType() == PlanItemType.SPOT
+                        || it.getType() == PlanItemType.ACTIVITY;
+                boolean empty = it.getEstCost() == null || it.getEstCost().signum() == 0;
+                if (costly && empty) {
+                    targets.add(it);
+                }
+            }
+        }
+        if (targets.isEmpty()) {
+            return; // 생성 프롬프트가 이미 다 채웠으면 추가 호출 없음
+        }
+
+        JsonNode root;
+        try {
+            String json = gemini.generateJson(buildCostPrompt(trip, plan, targets), COST_SCHEMA);
+            root = objectMapper.readTree(json);
+        } catch (Exception e) {
+            return; // 비용 보강 실패는 무시(일정은 그대로 유지)
+        }
+
+        Map<Long, PlanItem> byId = new HashMap<>();
+        for (PlanItem it : targets) {
+            byId.put(it.getId(), it);
+        }
+        JsonNode estimates = root.path("estimates");
+        if (estimates.isArray()) {
+            for (JsonNode e : estimates) {
+                PlanItem it = byId.get(e.path("id").asLong(0));
+                if (it != null && e.hasNonNull("estCost") && e.get("estCost").isNumber()) {
+                    BigDecimal cost = e.get("estCost").decimalValue();
+                    if (cost.signum() > 0) {
+                        it.changeEstCost(cost);
+                    }
+                }
+            }
+        }
+    }
+
+    private String buildCostPrompt(Trip trip, Plan plan, List<PlanItem> targets) {
+        String dest = plan.getDestinationCity() != null ? plan.getDestinationCity() : trip.getTitle();
+        List<Map<String, Object>> rows = new ArrayList<>();
+        for (PlanItem it : targets) {
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("id", it.getId());
+            row.put("type", it.getType().name());
+            row.put("title", it.getTitle());
+            row.put("place", it.getPlace() == null ? null : it.getPlace().getName());
+            rows.add(row);
+        }
+        String itemsJson;
+        try {
+            itemsJson = objectMapper.writeValueAsString(rows);
+        } catch (Exception e) {
+            itemsJson = "[]";
+        }
+        return """
+                너는 여행 식비/활동비 추정 도우미야. 아래 항목들의 '1인 평균 객단가'를 원화 정수로 추정해라.
+                - 목적지: %s
+                - 각 항목 title/place 에 적힌 구체적 상호/장소 기준, 1명이 실제 지불할 평균 금액(대표 메뉴 또는 입장료).
+                - 현지 통화가 아니라 반드시 '원화'로 환산. 정말 모르겠으면 0.
+                - 최신 일반 시세 기준의 추정치. 애매하면 과소·과대 없이 보수적으로.
+                - 입력의 모든 id 에 대해 각각 estCost 를 돌려줘라.
+                항목 목록(JSON): %s
+                지정된 JSON 스키마로만 응답해.
+                """.formatted(dest, itemsJson);
     }
 
     private PlanItem toItem(JsonNode it, int sort) {
@@ -150,7 +257,30 @@ public class AiPlanService {
                 .build();
     }
 
-    private String buildPrompt(Trip trip, long days, GeneratePlanRequest req) {
+    /** 확정 예약을 프롬프트용 텍스트로. 없으면 "없음". */
+    private String bookingsText(List<TripBooking> bookings) {
+        if (bookings == null || bookings.isEmpty()) {
+            return "없음";
+        }
+        StringBuilder sb = new StringBuilder();
+        for (TripBooking b : bookings) {
+            boolean hotel = b.getType() == BookingType.HOTEL;
+            sb.append(hotel ? "  - [숙소] " : "  - [항공] ").append(b.getTitle());
+            if (hotel) {
+                sb.append(" (").append(b.getStartDate()).append(" 체크인 ~ ").append(b.getEndDate()).append(" 체크아웃)");
+            } else {
+                sb.append(" (").append(b.getStartDate()).append(" 출발");
+                if (b.getEndDate() != null && !b.getEndDate().equals(b.getStartDate())) {
+                    sb.append(" ~ ").append(b.getEndDate()).append(" 귀국");
+                }
+                sb.append(")");
+            }
+            sb.append("\n");
+        }
+        return sb.toString().trim();
+    }
+
+    private String buildPrompt(Trip trip, long days, GeneratePlanRequest req, List<TripBooking> bookings) {
         String origin = (req.origin() == null || req.origin().isBlank()) ? "서울" : req.origin();
         String flightPref = switch (req.flightTime() == null ? "" : req.flightTime().toUpperCase()) {
             case "MORNING" -> "오전 출발 선호";
@@ -171,16 +301,24 @@ public class AiPlanService {
                 - 컨셉: %s
                 - 항공 선호: %s, %s
                 - 추가 요청: %s
+                - 이미 확정된 예약(이 날짜·항공/숙소를 반드시 전제로 삼아 일정을 구성):
+                %s
 
                 매우 중요한 규칙:
                 - destinationCity 에는 목적지 '도시명'만 한국어로 (예: "오사카", "부산").
                 - MEAL(식사)/SPOT(명소)/ACTIVITY 는 '실제 존재하는 구체적 상호명'을 title 에 넣어라.
                   나쁜 예: "점심 식사" / 좋은 예: "이치란 라멘 도톤보리점에서 점심".
                   placeName 에는 그 장소의 정확한 상호명, address 에는 대략 위치(동/구/거리)를 넣어라.
-                - 항공권과 숙소는 '실시간 예약'이 필요하므로 일정 항목으로 비용을 지어내지 마라.
-                  비행 이동(공항↔도심)은 MOVE 로 넣되 estCost 는 0. 숙소 체크인/아웃 정도만 STAY 로 표시(estCost 0).
-                - 현지 활동/식비(MEAL/SPOT/ACTIVITY)의 estCost 만 1인 기준 원화 정수로 추정. 모르면 0.
-                  항공+숙박을 제외하고도 전체 예산을 넘지 않도록 현지 비용을 보수적으로 잡아라.
+                - 항공권과 숙소는 '실시간 예약'이 필요하므로 일정 항목으로 비용을 지어내지 마라(estCost 0).
+                - '확정된 예약'에 이미 있는 항공/숙소는 시스템이 일정에 자동으로 넣는다. 너는 그 항공편/숙소에 대한
+                  STAY/MOVE 항목을 새로 만들지 마라. 대신 그 예약을 전제로(항공 출발·귀국 날짜, 숙소 체크인·아웃/위치)
+                  나머지 동선을 현실적으로 짜라(도착 첫날은 숙소 체크인 이후 근처부터, 마지막날은 출발 시간 전까지).
+                - 확정 예약이 '없는' 경우에만, 공항↔도심 이동은 MOVE(estCost 0), 숙소 체크인/아웃은 STAY(estCost 0)로 넣어도 된다.
+                - MEAL/SPOT/ACTIVITY 의 estCost 는 그 '구체적 상호'에서 1명이 실제로 지불할 평균 객단가를
+                  '원화 정수'로 추정해라(대표 메뉴/입장료 기준). 예: 이치란 라멘 1인 ≈ 12000, 성산일출봉 입장 ≈ 5000.
+                  - 현지 통화가 아니라 반드시 원화로 환산해 넣어라. 정말 모르겠으면 0.
+                  - 최신 일반 시세 기준의 '추정치'이며, 애매하면 과소·과대 없이 보수적으로 잡아라.
+                  - 항공+숙박을 제외한 현지 비용(estCost) 합이 전체 예산을 넘지 않도록 조절해라.
                 - dayNo 는 1부터 %d 까지. 각 일자 4~6개 항목, plannedStart/End 는 "HH:mm".
                 지정된 JSON 스키마로만 응답해.
                 """.formatted(
@@ -190,6 +328,7 @@ public class AiPlanService {
                 trip.getBudgetLimit() == null ? "미설정" : trip.getBudgetLimit().toPlainString() + "원",
                 trip.getConcept() == null ? "특별히 없음" : trip.getConcept(),
                 flightPref, lowCost, note,
+                bookingsText(bookings),
                 days);
     }
 

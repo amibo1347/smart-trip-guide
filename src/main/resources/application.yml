@@ -31,6 +31,11 @@ spring:
   jackson:
     time-zone: Asia/Seoul
 
+  servlet:
+    multipart:
+      max-file-size: 10MB        # 기록 사진 1장 상한
+      max-request-size: 12MB
+
   # 세션을 DB(JDBC)에 저장 → 백엔드 재시작에도 로그인 유지. 스키마는 Flyway(V10)가 관리.
   session:
     store-type: jdbc
@@ -43,6 +48,10 @@ spring:
 gemini:
   api-key: ${GEMINI_API_KEY:}
   model: ${GEMINI_MODEL:gemini-2.5-flash-lite}
+
+# 기록 사진 저장 위치(서버 로컬 파일). /uploads/** 로 정적 서빙. 운영은 UPLOAD_DIR 로 오버라이드.
+app:
+  upload-dir: ${UPLOAD_DIR:./uploads}
 
 logging:
   level:

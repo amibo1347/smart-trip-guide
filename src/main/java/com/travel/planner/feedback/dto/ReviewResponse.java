@@ -27,7 +27,8 @@ public record ReviewResponse(
             BigDecimal estCost, boolean visited, BigDecimal actualCost, Integer satisfaction) {
     }
 
-    public record LocationPoint(BigDecimal latitude, BigDecimal longitude, LocalDateTime recordedAt) {
+    public record LocationPoint(BigDecimal latitude, BigDecimal longitude, LocalDateTime recordedAt,
+                                String mood, BigDecimal amount, String memo, String photoUrl) {
     }
 
     public record FeedbackView(Integer overallScore, BigDecimal budgetDiff, String comment) {

@@ -55,6 +55,10 @@ public class Trip extends BaseEntity {
     @Column(nullable = false, length = 20)
     private TripStatus status;
 
+    /** 읽기 전용 공유 토큰. null 이면 비공개. 발급 시 /share/{token} 으로 누구나 일정 열람. */
+    @Column(name = "share_token", length = 64)
+    private String shareToken;
+
     @Builder
     private Trip(Long userId, String title, LocalDate startDate, LocalDate endDate,
                 int headcount, BigDecimal budgetLimit, String concept) {
@@ -77,5 +81,15 @@ public class Trip extends BaseEntity {
 
     public void changeStatus(TripStatus status) {
         this.status = status;
+    }
+
+    /** 공유 활성화: 토큰 지정. */
+    public void enableShare(String token) {
+        this.shareToken = token;
+    }
+
+    /** 공유 중단: 토큰 폐기. */
+    public void disableShare() {
+        this.shareToken = null;
     }
 }
