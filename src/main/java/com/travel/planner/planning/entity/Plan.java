@@ -48,6 +48,12 @@ public class Plan extends BaseEntity {
     @Column(name = "destination_city", length = 100)
     private String destinationCity;
 
+    @Column(name = "destination_lat", precision = 10, scale = 7)
+    private java.math.BigDecimal destinationLat;
+
+    @Column(name = "destination_lng", precision = 10, scale = 7)
+    private java.math.BigDecimal destinationLng;
+
     @Column(name = "prompt_snapshot", columnDefinition = "json")
     private String promptSnapshot;
 
@@ -57,12 +63,15 @@ public class Plan extends BaseEntity {
 
     @Builder
     private Plan(Long tripId, Integer version, GeneratedBy generatedBy, String aiModel,
-                 String destinationCity, String promptSnapshot) {
+                 String destinationCity, java.math.BigDecimal destinationLat,
+                 java.math.BigDecimal destinationLng, String promptSnapshot) {
         this.tripId = tripId;
         this.version = version;
         this.generatedBy = generatedBy == null ? GeneratedBy.USER : generatedBy;
         this.aiModel = aiModel;
         this.destinationCity = destinationCity;
+        this.destinationLat = destinationLat;
+        this.destinationLng = destinationLng;
         this.promptSnapshot = promptSnapshot;
     }
 

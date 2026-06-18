@@ -48,6 +48,7 @@ public class AiPlanService {
     private final TripBookingRepository bookingRepository;
     private final PlanService planService;
     private final ObjectMapper objectMapper;
+    private final com.travel.planner.tracking.service.GeocodingService geocodingService;
 
     private static final Map<String, Object> ITEM_SCHEMA = Map.of(
             "type", "OBJECT",
@@ -108,12 +109,19 @@ public class AiPlanService {
         int version = planRepository.findTopByTripIdOrderByVersionDesc(tripId)
                 .map(p -> p.getVersion() + 1).orElse(1);
 
+        // 목적지 도시를 좌표로 변환 → 지도 링크를 그 지역 중심으로 띄워 검색(동명 오매칭 방지).
+        // 실패해도 일정 생성은 그대로 진행(프런트는 좌표 없이 폴백).
+        String destCity = text(root, "destinationCity");
+        BigDecimal[] coord = geocodingService.forward(destCity);
+
         Plan plan = Plan.builder()
                 .tripId(tripId)
                 .version(version)
                 .generatedBy(GeneratedBy.AI)
                 .aiModel(gemini.model())
-                .destinationCity(text(root, "destinationCity"))
+                .destinationCity(destCity)
+                .destinationLat(coord == null ? null : coord[0])
+                .destinationLng(coord == null ? null : coord[1])
                 .promptSnapshot(snapshot(trip, req))
                 .build();
 

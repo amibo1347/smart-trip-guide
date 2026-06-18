@@ -109,7 +109,7 @@ export default function Itinerary({ trip, onError }) {
                     )}
                     {it.place?.address && <>📍 {it.place.address} </>}
                     {(it.type === 'SPOT' || it.type === 'MEAL' || it.type === 'ACTIVITY') && (
-                      <a className="maplink" href={mapUrl(it, plan?.destinationCity)} target="_blank" rel="noreferrer">🗺 {t('지도')}</a>
+                      <a className="maplink" href={mapUrl(it, plan)} target="_blank" rel="noreferrer">🗺 {t('지도')}</a>
                     )}
                   </div>
                 )}
@@ -270,12 +270,18 @@ function BookingHelper({ trip, plan, onError }) {
   )
 }
 
-function mapUrl(item, destinationCity) {
+function mapUrl(item, plan) {
   const name = item.place?.name || item.title
-  // 지역 고정용 컨텍스트: 주소가 있으면 주소를, 없으면 목적지 도시를 검색어에 덧붙인다.
-  // "스파"·"온천"처럼 모호한 한국어 검색어가 국내(한국) 결과로 빠지는 것을 막는다.
-  // (예: 일본 일정이면 "온천 오사카" 로 검색되어 현지 결과가 잡힌다)
-  const region = item.place?.address || destinationCity || ''
+  const lat = plan?.destinationLat
+  const lng = plan?.destinationLng
+  // 목적지 좌표가 있으면 '그 지역 중심'으로 지도를 띄운 채 검색한다(@위도,경도,줌z).
+  // 텍스트로 도시명을 덧붙이는 게 아니라 실제 위치에서 검색하므로,
+  // "홍콩반점(한국)" 같은 이름에 지역명만 들어간 엉뚱한 곳이 걸러진다.
+  if (lat != null && lng != null) {
+    return `https://www.google.com/maps/search/${encodeURIComponent(name)}/@${lat},${lng},12z`
+  }
+  // 좌표가 없는(구버전) 일정은 폴백: 주소/도시명을 검색어에 덧붙여 지역을 보정한다.
+  const region = item.place?.address || plan?.destinationCity || ''
   const q = region && !name.includes(region) ? `${name} ${region}` : name
   return GMAPS_SEARCH + encodeURIComponent(q)
 }

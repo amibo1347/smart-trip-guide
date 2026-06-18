@@ -49,6 +49,45 @@ public class GeocodingService {
         }
     }
 
+    /**
+     * 지명(예: "오사카", "부산") → 대표 좌표 정방향 지오코딩. 지도 검색을 '그 지역 중심'으로
+     * 띄우는 데 사용. 실패/결과 없음 시 null → 호출측은 좌표 없이 폴백.
+     * accept-language=ko 로 한국어 지명도 해석되게 한다.
+     */
+    public BigDecimal[] forward(String query) {
+        if (query == null || query.isBlank()) {
+            return null;
+        }
+        try {
+            String enc = java.net.URLEncoder.encode(query.trim(), java.nio.charset.StandardCharsets.UTF_8);
+            String url = "https://nominatim.openstreetmap.org/search?format=jsonv2"
+                    + "&limit=1&accept-language=ko&q=" + enc;
+            String json = Jsoup.connect(url)
+                    .userAgent(UA)
+                    .header("Accept", "application/json")
+                    .ignoreContentType(true)
+                    .timeout(5000)
+                    .execute().body();
+            JsonNode arr = objectMapper.readTree(json);
+            if (!arr.isArray() || arr.isEmpty()) {
+                return null;
+            }
+            JsonNode hit = arr.get(0);
+            if (!hit.hasNonNull("lat") || !hit.hasNonNull("lon")) {
+                return null;
+            }
+            BigDecimal lat = new BigDecimal(hit.get("lat").asText()).setScale(7, RoundingMode.HALF_UP);
+            BigDecimal lon = new BigDecimal(hit.get("lon").asText()).setScale(7, RoundingMode.HALF_UP);
+            if (!isValidCoord(lat, BigDecimal.valueOf(90)) || !isValidCoord(lon, BigDecimal.valueOf(180))) {
+                return null;
+            }
+            return new BigDecimal[]{lat, lon};
+        } catch (Exception e) {
+            log.debug("정방향 지오코딩 실패 ({}): {}", query, e.toString());
+            return null;
+        }
+    }
+
     /** 값이 null 이 아니고 |값| <= limit 인지(위도 90 / 경도 180 범위 검증). */
     private static boolean isValidCoord(BigDecimal v, BigDecimal limit) {
         return v != null && v.abs().compareTo(limit) <= 0;
