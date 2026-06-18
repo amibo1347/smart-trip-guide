@@ -109,7 +109,7 @@ export default function Itinerary({ trip, onError }) {
                     )}
                     {it.place?.address && <>📍 {it.place.address} </>}
                     {(it.type === 'SPOT' || it.type === 'MEAL' || it.type === 'ACTIVITY') && (
-                      <a className="maplink" href={mapUrl(it)} target="_blank" rel="noreferrer">🗺 {t('지도')}</a>
+                      <a className="maplink" href={mapUrl(it, plan?.destinationCity)} target="_blank" rel="noreferrer">🗺 {t('지도')}</a>
                     )}
                   </div>
                 )}
@@ -270,8 +270,13 @@ function BookingHelper({ trip, plan, onError }) {
   )
 }
 
-function mapUrl(item) {
-  const q = item.place?.name || item.title
+function mapUrl(item, destinationCity) {
+  const name = item.place?.name || item.title
+  // 지역 고정용 컨텍스트: 주소가 있으면 주소를, 없으면 목적지 도시를 검색어에 덧붙인다.
+  // "스파"·"온천"처럼 모호한 한국어 검색어가 국내(한국) 결과로 빠지는 것을 막는다.
+  // (예: 일본 일정이면 "온천 오사카" 로 검색되어 현지 결과가 잡힌다)
+  const region = item.place?.address || destinationCity || ''
+  const q = region && !name.includes(region) ? `${name} ${region}` : name
   return GMAPS_SEARCH + encodeURIComponent(q)
 }
 
