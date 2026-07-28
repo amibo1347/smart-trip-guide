@@ -88,6 +88,52 @@ public class GeocodingService {
         }
     }
 
+    /** 장소 검색 후보 한 건(수동 위치 지정 화면에서 목록으로 보여준다). */
+    public record PlaceCandidate(String displayName, BigDecimal latitude, BigDecimal longitude) {
+    }
+
+    /**
+     * 지명/상호 검색 → 후보 목록. 사용자가 지도에서 직접 위치를 고를 때 쓴다(자동 1건 선택인 forward 와 달리 여러 후보 제공).
+     * 실패 시 빈 목록.
+     */
+    public List<PlaceCandidate> search(String query, int limit) {
+        if (query == null || query.isBlank()) {
+            return List.of();
+        }
+        try {
+            String enc = java.net.URLEncoder.encode(query.trim(), java.nio.charset.StandardCharsets.UTF_8);
+            String url = "https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=0"
+                    + "&limit=" + Math.max(1, Math.min(limit, 10)) + "&accept-language=ko&q=" + enc;
+            String json = Jsoup.connect(url)
+                    .userAgent(UA)
+                    .header("Accept", "application/json")
+                    .ignoreContentType(true)
+                    .timeout(5000)
+                    .execute().body();
+            JsonNode arr = objectMapper.readTree(json);
+            if (!arr.isArray()) {
+                return List.of();
+            }
+            List<PlaceCandidate> out = new ArrayList<>();
+            for (JsonNode hit : arr) {
+                if (!hit.hasNonNull("lat") || !hit.hasNonNull("lon")) {
+                    continue;
+                }
+                BigDecimal lat = new BigDecimal(hit.get("lat").asText()).setScale(7, RoundingMode.HALF_UP);
+                BigDecimal lon = new BigDecimal(hit.get("lon").asText()).setScale(7, RoundingMode.HALF_UP);
+                if (!isValidCoord(lat, BigDecimal.valueOf(90)) || !isValidCoord(lon, BigDecimal.valueOf(180))) {
+                    continue;
+                }
+                String name = hit.hasNonNull("display_name") ? hit.get("display_name").asText() : query;
+                out.add(new PlaceCandidate(name, lat, lon));
+            }
+            return out;
+        } catch (Exception e) {
+            log.debug("장소 검색 실패 ({}): {}", query, e.toString());
+            return List.of();
+        }
+    }
+
     /** 값이 null 이 아니고 |값| <= limit 인지(위도 90 / 경도 180 범위 검증). */
     private static boolean isValidCoord(BigDecimal v, BigDecimal limit) {
         return v != null && v.abs().compareTo(limit) <= 0;

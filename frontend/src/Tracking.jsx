@@ -1,11 +1,9 @@
-import { useEffect, useRef, useState } from 'react'
-import L from 'leaflet'
-import 'leaflet/dist/leaflet.css'
+import { useEffect, useState } from 'react'
 import { api } from './api.js'
+import RouteMap from './RouteMap.jsx'
 import { enqueue, pendingCount, flush } from './offlineQueue.js'
 import { useI18n } from './i18n/index.jsx'
 import { fmtDt, nowLocal, uuid, won } from './utils/format.js'
-import { createMap, pinIcon, popupHtml, DEFAULT_CENTER, DEFAULT_ZOOM, ROUTE_COLOR } from './utils/mapMarkers.js'
 
 const MOODS = ['😀', '😍', '😌', '😐', '😫', '🤩', '🥵', '🌧']
 const CATEGORIES = ['식비', '교통', '숙박', '관광', '기타']
@@ -17,6 +15,8 @@ export default function Tracking({ trip, onError }) {
   const [pending, setPending] = useState(pendingCount())
   const [online, setOnline] = useState(navigator.onLine)
   const [tick, setTick] = useState(0) // 기록 변경 시 예산 경고 재조회 트리거
+  // 노선도(장소별)에 붙지 않은 일반 기록만 아래 목록에 — 장소 기록은 노선도에서 관리.
+  const generalMoments = moments.filter((m) => m.planItemId == null)
 
   async function loadAll() {
     try {
@@ -65,22 +65,28 @@ export default function Tracking({ trip, onError }) {
 
       <BudgetAlert trip={trip} tick={tick} onError={onError} />
 
-      <MomentMap moments={moments} />
+      {/* 일정 노선도 + 장소별 기록(사진·지출·메모를 한 장소에 함께). 기록 시 예산/지출목록도 갱신. */}
+      <RouteMap trip={trip} onRecorded={loadAll} onError={onError} />
 
+      {/* 특정 장소에 매이지 않은 일반 지출·메모(예: 도시 간 이동비). 장소별 기록은 위 노선도에서. */}
       <RecordCard trip={trip} online={online}
                   onSaved={loadAll}
                   onQueued={() => setPending(pendingCount())}
                   onError={onError} />
 
       <section className="card">
-        <h3>🧾 {t('기록')} ({moments.length})
+        <h3>🧾 {t('기타 지출·메모')} ({generalMoments.length})
           {summary && summary.total > 0 && (
             <span className="muted" style={{ fontWeight: 400, fontSize: '0.85rem' }}>
-              {' '}· {t('지출')} {Number(summary.total).toLocaleString()}{t('원')}</span>
+              {' '}· {t('전체 지출')} {Number(summary.total).toLocaleString()}{t('원')}</span>
           )}
         </h3>
+        <p className="muted small-text" style={{ marginTop: 0 }}>
+          {t('장소에 남긴 기록은 위 노선도에 있어요. 여기는 특정 장소와 무관한 기록만 모입니다.')}
+        </p>
+
         <ul className="items">
-          {moments.slice(0, 20).map((m) => (
+          {generalMoments.slice(0, 20).map((m) => (
             <li key={m.id} className="moment">
               {m.photoUrl && <img className="m-thumb" src={m.photoUrl} alt="" />}
               <div className="m-body">
@@ -92,14 +98,11 @@ export default function Tracking({ trip, onError }) {
                 <div className="item-meta">
                   🕐 {fmtDt(m.recordedAt)}
                   {m.amount != null && <> · 💰 {Number(m.amount).toLocaleString()}{t('원')}{m.category ? ` (${t(m.category)})` : ''}</>}
-                  {m.place
-                    ? <> · 📍 {m.place}</>
-                    : m.latitude != null && <> · 📍 {t('위치 기록됨')}</>}
                 </div>
               </div>
             </li>
           ))}
-          {moments.length === 0 && <p className="muted small-text">{t('아직 기록이 없습니다. 위에서 첫 기록을 남겨보세요.')}</p>}
+          {generalMoments.length === 0 && <p className="muted small-text">{t('아직 일반 기록이 없어요.')}</p>}
         </ul>
       </section>
     </div>
@@ -141,6 +144,16 @@ function BudgetAlert({ trip, tick, onError }) {
         <span>{t('쓴 금액')} <b>{w(b.liveTotal)}</b></span>
         <span>{t('한도')} {w(b.budgetLimit)}</span>
       </div>
+      {/* 여럿이 가는 여행이면 지금까지 쓴 돈의 1인당 몫도 함께 — 정산 감각을 여행 중에 유지 */}
+      {b.headcount > 1 && b.perPersonLive != null && (
+        <div className="split">
+          <div>
+            <div className="split-l">🧮 {t('지금까지 1인당')}</div>
+            <div className="split-sub">{t('쓴 금액 ÷ {n}명', { n: b.headcount })}</div>
+          </div>
+          <div className="split-v">{w(b.perPersonLive)}</div>
+        </div>
+      )}
       <p className="ba-msg">
         {over
           ? t('한도보다 {amount} 더 썼어요.', { amount: w(b.liveOverAmount) })
@@ -153,49 +166,24 @@ function BudgetAlert({ trip, tick, onError }) {
   )
 }
 
-// 저장 시 현재 위치를 1회 측정. GPS가 꺼졌거나 거부/실패하면 null(위치 없이 저장).
-function getPosition() {
-  return new Promise((resolve) => {
-    if (!navigator.geolocation) return resolve(null)
-    navigator.geolocation.getCurrentPosition(
-      (p) => resolve({ lat: p.coords.latitude, lng: p.coords.longitude, accuracy: p.coords.accuracy }),
-      () => resolve(null),
-      { enableHighAccuracy: true, timeout: 8000 },
-    )
-  })
-}
-
 function RecordCard({ trip, online, onSaved, onQueued, onError }) {
   const { t } = useI18n()
   const empty = { mood: '', amount: '', category: '식비', memo: '' }
   const [form, setForm] = useState(empty)
-  const [photo, setPhoto] = useState(null)   // File
-  const [preview, setPreview] = useState(null)
   const [busy, setBusy] = useState(false)
 
-  // 미리보기 objectURL 누수 방지: 새 사진/언마운트 시 이전 URL 해제
-  useEffect(() => () => { if (preview) URL.revokeObjectURL(preview) }, [preview])
-
-  function pickPhoto(e) {
-    const f = e.target.files?.[0] || null
-    setPhoto(f)
-    setPreview(f ? URL.createObjectURL(f) : null)
-  }
-
-  function reset() {
-    setForm(empty); setPhoto(null); setPreview(null)
-  }
+  function reset() { setForm(empty) }
 
   async function save(e) {
     e.preventDefault()
     setBusy(true)
-    const loc = await getPosition() // 기록 누르는 순간 현재 위치 자동 측정(실패 시 위치 없이 저장)
+    // 지출·기분·메모만 기록한다(위치는 사진과 함께 '일정 노선도'에서 관리하므로 GPS 측정 안 함).
     const data = {
       clientUuid: uuid(),
       recordedAt: nowLocal(),
-      latitude: loc?.lat ?? null,
-      longitude: loc?.lng ?? null,
-      accuracyM: loc?.accuracy ?? null,
+      latitude: null,
+      longitude: null,
+      accuracyM: null,
       mood: form.mood || null,
       amount: form.amount === '' ? null : Number(form.amount),
       category: form.amount === '' ? null : form.category,
@@ -203,13 +191,11 @@ function RecordCard({ trip, online, onSaved, onQueued, onError }) {
     }
     try {
       if (!online) {
-        // 오프라인: 사진은 큐에 담을 수 없어 텍스트 기록만 적재(복귀 시 동기화)
-        if (photo) onError(t('오프라인에서는 사진을 저장할 수 없어 텍스트만 기록됩니다.'))
         enqueue({ path: `/api/trips/${trip.id}/moments`, body: data })
         onQueued()
         reset()
       } else {
-        await api.recordMoment(trip.id, data, photo)
+        await api.recordMoment(trip.id, data, null)
         reset()
         onSaved()
       }
@@ -218,7 +204,7 @@ function RecordCard({ trip, online, onSaved, onQueued, onError }) {
 
   return (
     <section className="card">
-      <h3>✍️ {t('기록하기')}</h3>
+      <h3>✍️ {t('지출·메모 기록')}</h3>
       <form onSubmit={save}>
         {/* 기분 */}
         <div className="moodbar">
@@ -247,56 +233,11 @@ function RecordCard({ trip, online, onSaved, onQueued, onError }) {
         <input placeholder={t('메모(선택) — 무엇을 했는지 한 줄')} value={form.memo}
                onChange={(e) => setForm({ ...form, memo: e.target.value })} />
 
-        {/* 사진(선택) */}
-        <div className="photo-row">
-          <label className="photo-pick">
-            📷 {t('사진 첨부(선택)')}
-            <input type="file" accept="image/*" capture="environment" onChange={pickPhoto} hidden disabled={!online} />
-          </label>
-          {preview && <img className="m-thumb" src={preview} alt="" />}
-          {!online && <span className="muted small-text">{t('오프라인에선 사진 첨부 불가')}</span>}
-        </div>
-
-        <button disabled={busy}>{busy ? t('기록 중...') : t('이 순간 기록')}</button>
+        <button disabled={busy}>{busy ? t('기록 중...') : t('기록하기')}</button>
         <p className="muted small-text" style={{ textAlign: 'center', margin: 0 }}>
-          📍 {t('위치 권한이 켜져 있으면 누른 순간의 위치가 함께 기록돼요.')}
+          📷 {t('사진은 위 노선도에서 방문한 장소에 붙일 수 있어요.')}
         </p>
       </form>
     </section>
   )
-}
-
-function MomentMap({ moments }) {
-  const { t } = useI18n()
-  const ref = useRef(null)
-  const mapRef = useRef(null)
-
-  useEffect(() => {
-    if (mapRef.current) return
-    const map = createMap(ref.current)
-    mapRef.current = map
-    map.setView(DEFAULT_CENTER, DEFAULT_ZOOM)
-    return () => { map.remove(); mapRef.current = null }
-  }, [])
-
-  // moments 변경 시 마커 다시 그림
-  useEffect(() => {
-    const map = mapRef.current
-    if (!map) return
-    const layer = L.layerGroup().addTo(map)
-    const pts = []
-    // 오래된→최신 순으로 경로/마커
-    const withLoc = [...moments].filter((m) => m.latitude != null && m.longitude != null).reverse()
-    withLoc.forEach((m) => {
-      const p = [Number(m.latitude), Number(m.longitude)]
-      pts.push(p)
-      L.marker(p, { icon: pinIcon(m) }).bindPopup(popupHtml(m, t, fmtDt)).addTo(layer)
-    })
-    if (pts.length > 1) L.polyline(pts, { color: ROUTE_COLOR, weight: 3, opacity: 0.4 }).addTo(layer)
-    if (pts.length === 1) map.setView(pts[0], 14)
-    else if (pts.length > 1) map.fitBounds(pts, { padding: [40, 40] })
-    return () => { layer.remove() }
-  }, [moments, t])
-
-  return <div ref={ref} className="map" />
 }

@@ -34,6 +34,7 @@ public class PlanController {
     private final PlanService planService;
     private final AccommodationService accommodationService;
     private final AiPlanService aiPlanService;
+    private final com.travel.planner.planning.service.DaySuggestService daySuggestService;
     private final BookingLinkService bookingLinkService;
     private final CurrentUser currentUser;
 
@@ -51,6 +52,13 @@ public class PlanController {
         GeneratePlanRequest req = (request == null)
                 ? new GeneratePlanRequest(null, null, null, null) : request;
         return aiPlanService.generate(tripId, currentUser.requireId(auth), req);
+    }
+
+    /** '이 날 AI 추천' — 하루치 장소 몇 곳을 제안(플랜 변경 없음). 담는 건 사용자가 직접. */
+    @PostMapping("/api/trips/{tripId}/plan-days/{dayId}/suggest")
+    public java.util.List<com.travel.planner.planning.dto.DaySuggestion> suggestDay(
+            @PathVariable Long tripId, @PathVariable Long dayId, Authentication auth) {
+        return daySuggestService.suggest(tripId, dayId, currentUser.requireId(auth));
     }
 
     /** 항공/숙소 예약 핸드오프 딥링크. */

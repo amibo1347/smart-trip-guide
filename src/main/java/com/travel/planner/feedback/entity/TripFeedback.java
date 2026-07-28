@@ -38,17 +38,37 @@ public class TripFeedback extends BaseEntity {
     @Column(length = 2000)
     private String comment;
 
+    /** 좋았던 점 */
+    @Column(length = 1000)
+    private String liked;
+
+    /** 아쉬웠던 점 */
+    @Column(length = 1000)
+    private String regret;
+
+    /** 다음엔 이렇게 */
+    @Column(name = "next_time", length = 1000)
+    private String nextTime;
+
     @Builder
-    private TripFeedback(Long tripId, Integer overallScore, BigDecimal budgetDiff, String comment) {
+    private TripFeedback(Long tripId, Integer overallScore, BigDecimal budgetDiff, String comment,
+                         String liked, String regret, String nextTime) {
         this.tripId = tripId;
         this.overallScore = overallScore;
         this.budgetDiff = budgetDiff;
         this.comment = comment;
+        this.liked = liked;
+        this.regret = regret;
+        this.nextTime = nextTime;
     }
 
-    public void update(Integer overallScore, BigDecimal budgetDiff, String comment) {
+    public void update(Integer overallScore, BigDecimal budgetDiff, String comment,
+                       String liked, String regret, String nextTime) {
         this.overallScore = overallScore;
         this.budgetDiff = budgetDiff;
         this.comment = comment;
+        this.liked = liked;
+        this.regret = regret;
+        this.nextTime = nextTime;
     }
 }

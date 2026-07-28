@@ -62,6 +62,20 @@ public class BookingController {
         return bookingService.add(tripId, req, null, currentUser.requireId(auth));
     }
 
+    /** 예약 확인증(항공권 e-티켓·숙소 바우처) 첨부 — 이미지 또는 PDF. */
+    @PostMapping(path = "/api/bookings/{id}/ticket", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public BookingResponse attachTicket(@PathVariable Long id,
+                                        @RequestPart("file") MultipartFile file,
+                                        Authentication auth) {
+        return bookingService.attachTicket(id, file, currentUser.requireId(auth));
+    }
+
+    @DeleteMapping("/api/bookings/{id}/ticket")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void removeTicket(@PathVariable Long id, Authentication auth) {
+        bookingService.removeTicket(id, currentUser.requireId(auth));
+    }
+
     @DeleteMapping("/api/bookings/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void delete(@PathVariable Long id, Authentication auth) {

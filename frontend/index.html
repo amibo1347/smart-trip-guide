@@ -3,8 +3,28 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <!-- viewport-fit=cover: 노치/홈 인디케이터 영역까지 그리고 CSS 의 env(safe-area-inset-*) 로 여백을 준다 -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="theme-color" content="#2563eb" />
+    <meta name="theme-color" content="#0A3D62" />
+    <meta name="description" content="여행 계획·기록·복기를 잇는 스마트 여행 플래너. 일정을 만들고 친구들에게 링크 하나로 공유하세요." />
+
+    <!-- iOS 홈 화면에 추가하면 전체화면 앱처럼 동작 -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="여행플래너" />
+    <!-- 일정 안의 숫자(가격·시간)를 iOS 가 전화번호로 오인해 링크 걸지 않도록 -->
+    <meta name="format-detection" content="telephone=no" />
+
+    <!-- 공유 미리보기(카톡·SNS 카드).
+         /share/{token} 요청은 SpaController 가 아래 자리표시자를 그 여행의 제목·기간 OG 메타로 치환한다.
+         대부분의 크롤러(페북·카카오)는 같은 property 가 여럿이면 '첫 번째'를 쓰므로
+         자리표시자가 반드시 기본값보다 앞에 있어야 여행별 메타가 이긴다. -->
+    <meta property="og:site_name" content="스마트 여행 플래너" />
+    <meta property="og:locale" content="ko_KR" />
+    <!--OG-->
+    <meta property="og:title" content="스마트 여행 플래너" />
+    <meta property="og:description" content="여행 계획·기록·복기를 잇는 스마트 여행 플래너" />
+
     <title>스마트 여행 플래너</title>
   </head>
   <body>

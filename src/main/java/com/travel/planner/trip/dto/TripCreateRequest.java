@@ -13,6 +13,11 @@ import java.time.LocalDate;
  */
 public record TripCreateRequest(
         @NotBlank @Size(max = 100) String title,
+        // 목적지(선택) — 넣으면 인기/주변 장소 탐색이 그 좌표 기준으로 켜진다.
+        @Size(max = 120) String destinationName,
+        BigDecimal destinationLat,
+        BigDecimal destinationLng,
+        @Size(max = 1000) String destinationPhoto,
         @NotNull LocalDate startDate,
         @NotNull LocalDate endDate,
         @NotNull @Positive Integer headcount,

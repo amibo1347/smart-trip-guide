@@ -32,6 +32,10 @@ public class TripMoment extends BaseEntity {
     @Column(name = "trip_id", nullable = false)
     private Long tripId;
 
+    /** 이 기록이 붙은 일정 항목(노선도의 장소). null 이면 특정 장소와 무관한 일반 기록. */
+    @Column(name = "plan_item_id")
+    private Long planItemId;
+
     @Column(name = "client_uuid", nullable = false, length = 64)
     private String clientUuid;
 
@@ -66,10 +70,11 @@ public class TripMoment extends BaseEntity {
     private String photoUrl;
 
     @Builder
-    private TripMoment(Long tripId, String clientUuid, LocalDateTime recordedAt,
+    private TripMoment(Long tripId, Long planItemId, String clientUuid, LocalDateTime recordedAt,
                        BigDecimal latitude, BigDecimal longitude, Float accuracyM, String place,
                        String mood, BigDecimal amount, String category, String memo, String photoUrl) {
         this.tripId = tripId;
+        this.planItemId = planItemId;
         this.clientUuid = clientUuid;
         this.recordedAt = recordedAt;
         this.latitude = latitude;

@@ -12,12 +12,12 @@ public final class MomentResponses {
     }
 
     public record MomentResponse(
-            Long id, String clientUuid, LocalDateTime recordedAt,
+            Long id, Long planItemId, String clientUuid, LocalDateTime recordedAt,
             BigDecimal latitude, BigDecimal longitude, Float accuracyM, String place,
             String mood, BigDecimal amount, String category, String memo, String photoUrl) {
 
         public static MomentResponse from(TripMoment m) {
-            return new MomentResponse(m.getId(), m.getClientUuid(), m.getRecordedAt(),
+            return new MomentResponse(m.getId(), m.getPlanItemId(), m.getClientUuid(), m.getRecordedAt(),
                     m.getLatitude(), m.getLongitude(), m.getAccuracyM(), m.getPlace(),
                     m.getMood(), m.getAmount(), m.getCategory(), m.getMemo(), m.getPhotoUrl());
         }

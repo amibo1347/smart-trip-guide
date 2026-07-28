@@ -112,10 +112,14 @@ public class PlanService {
     }
 
     private Plan createInitialPlan(Trip trip) {
+        // 여행에 목적지가 있으면 그 좌표를 플랜 중심으로 심는다 → 노선도가 목적지 기준으로 뜬다.
         Plan plan = Plan.builder()
                 .tripId(trip.getId())
                 .version(1)
                 .generatedBy(GeneratedBy.USER)
+                .destinationCity(trip.getDestinationName())
+                .destinationLat(trip.getDestinationLat())
+                .destinationLng(trip.getDestinationLng())
                 .build();
 
         int dayNo = 1;

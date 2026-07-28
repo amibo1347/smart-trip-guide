@@ -1,10 +1,8 @@
-import { useEffect, useRef, useState } from 'react'
-import L from 'leaflet'
-import 'leaflet/dist/leaflet.css'
+import { useEffect, useState } from 'react'
 import { api } from './api.js'
+import RouteMap from './RouteMap.jsx'
 import { useI18n } from './i18n/index.jsx'
-import { fmtDt, pct, won } from './utils/format.js'
-import { createMap, pinIcon, popupHtml, ROUTE_COLOR } from './utils/mapMarkers.js'
+import { pct, won } from './utils/format.js'
 import { PLAN_TYPE, typeName } from './constants/labels.js'
 import Row from './components/Row.jsx'
 
@@ -20,22 +18,11 @@ export default function Review({ trip, onError }) {
   if (!review) return <p className="muted">{t('복기 정보를 불러오는 중...')}</p>
 
   const { budgetLimit, plannedCostTotal, actualSpent, budgetDiff,
-          expenseByCategory, locationCount, moodCount, visitedCount, totalItems,
-          items, locations } = review
+          expenseByCategory, items } = review
 
   return (
     <div>
       <ReportCard trip={trip} onError={onError} />
-
-      {/* 요약 */}
-      <section className="card">
-        <h3>📊 {t('한눈에 보기')}</h3>
-        <div className="stat-grid">
-          <Stat label={t('방문')} value={`${visitedCount}/${totalItems}`} />
-          <Stat label={t('기록 위치')} value={locationCount} />
-          <Stat label={t('기분 기록')} value={moodCount} />
-        </div>
-      </section>
 
       {/* 예산 vs 실제 */}
       <section className="card">
@@ -61,13 +48,8 @@ export default function Review({ trip, onError }) {
         </div>
       </section>
 
-      {/* 지도 */}
-      <section className="card">
-        <h3>🗺 {t('이동 경로')} ({locationCount})</h3>
-        {locations.length === 0
-          ? <p className="muted small-text">{t('기록된 위치가 없습니다. ‘기록’ 탭에서 위치를 남겨보세요.')}</p>
-          : <MapView locations={locations} />}
-      </section>
+      {/* 여행 노선도 (일정 기반) — 읽기 전용. 복기에서는 다녀온 경로와 장소별 사진을 함께 본다. */}
+      <RouteMap trip={trip} readOnly onError={onError} />
 
       {/* 계획 vs 실제 */}
       <section className="card">
@@ -84,10 +66,6 @@ export default function Review({ trip, onError }) {
       <FeedbackCard trip={trip} feedback={review.feedback} onSaved={load} onError={onError} />
     </div>
   )
-}
-
-function Stat({ label, value }) {
-  return <div className="stat"><div className="stat-v">{value}</div><div className="stat-l">{label}</div></div>
 }
 
 /** 기록 데이터를 바탕으로 AI가 여행을 요약. 현재 UI 언어로 생성. */
@@ -138,34 +116,6 @@ function ReportCard({ trip, onError }) {
       )}
     </section>
   )
-}
-
-function MapView({ locations }) {
-  const { t } = useI18n()
-  const ref = useRef(null)
-  const mapRef = useRef(null)
-
-  useEffect(() => {
-    if (mapRef.current) return
-    const map = createMap(ref.current)
-    mapRef.current = map
-
-    // 시간순(오래된→최신)으로 사진 핀 + 경로
-    const ordered = [...locations].reverse()
-    const pts = ordered.map((l) => [Number(l.latitude), Number(l.longitude)])
-    ordered.forEach((l, i) => {
-      L.marker(pts[i], { icon: pinIcon(l) }).bindPopup(popupHtml(l, t, fmtDt)).addTo(map)
-    })
-    if (pts.length > 1) {
-      L.polyline(pts, { color: ROUTE_COLOR, weight: 3, opacity: 0.5 }).addTo(map)
-    }
-    if (pts.length === 1) map.setView(pts[0], 14)
-    else if (pts.length > 1) map.fitBounds(pts, { padding: [30, 30] })
-
-    return () => { map.remove(); mapRef.current = null }
-  }, [locations, t])
-
-  return <div ref={ref} className="map" />
 }
 
 function ActualRow({ item, onSaved, onError }) {
@@ -222,13 +172,22 @@ function FeedbackCard({ trip, feedback, onSaved, onError }) {
   const { t } = useI18n()
   const [score, setScore] = useState(feedback?.overallScore ?? 0)
   const [comment, setComment] = useState(feedback?.comment ?? '')
+  const [liked, setLiked] = useState(feedback?.liked ?? '')
+  const [regret, setRegret] = useState(feedback?.regret ?? '')
+  const [nextTime, setNextTime] = useState(feedback?.nextTime ?? '')
   const [busy, setBusy] = useState(false)
   const [savedMsg, setSavedMsg] = useState('')
 
   async function save() {
     setBusy(true); setSavedMsg('')
     try {
-      await api.saveFeedback(trip.id, { overallScore: score || null, comment: comment || null })
+      await api.saveFeedback(trip.id, {
+        overallScore: score || null,
+        comment: comment.trim() || null,
+        liked: liked.trim() || null,
+        regret: regret.trim() || null,
+        nextTime: nextTime.trim() || null,
+      })
       setSavedMsg(t('저장됨 ✓'))
       onSaved()
     } catch (e) { onError(e.message) } finally { setBusy(false) }
@@ -237,16 +196,35 @@ function FeedbackCard({ trip, feedback, onSaved, onError }) {
   return (
     <section className="card">
       <h3>📝 {t('여행 일기')}</h3>
-      <div className="brow"><span>{t('전체 만족도')}</span>
+      <p className="muted small-text" style={{ marginTop: -2 }}>
+        {t('이번 여행을 찬찬히 되돌아보며 남겨보세요. 나중에 다시 꺼내보는 기록이 돼요.')}
+      </p>
+
+      <div className="brow" style={{ marginTop: 4 }}><span>{t('전체 만족도')}</span>
         <span className="stars">
           {[1, 2, 3, 4, 5].map((n) => (
             <button key={n} className={'star' + (n <= score ? ' on' : '')} onClick={() => setScore(n)}>★</button>
           ))}
         </span>
       </div>
-      <textarea className="ta" rows="3" placeholder={t('이번 여행은 어땠나요?')} value={comment}
-                onChange={(e) => setComment(e.target.value)} />
-      <button disabled={busy} onClick={save}>{busy ? t('저장 중...') : t(' 일기 기록')}</button>
+
+      <label className="diary-label">📔 {t('오늘의 여행 일기')}</label>
+      <textarea className="ta" rows="4" placeholder={t('무엇을 하고, 무엇을 느꼈나요? 기억하고 싶은 순간을 자유롭게 적어보세요.')}
+                value={comment} onChange={(e) => setComment(e.target.value)} />
+
+      <label className="diary-label">😊 {t('좋았던 점')}</label>
+      <textarea className="ta" rows="2" placeholder={t('가장 만족스러웠던 장소·음식·순간은?')}
+                value={liked} onChange={(e) => setLiked(e.target.value)} />
+
+      <label className="diary-label">😅 {t('아쉬웠던 점')}</label>
+      <textarea className="ta" rows="2" placeholder={t('아쉬웠거나 다음엔 피하고 싶은 건?')}
+                value={regret} onChange={(e) => setRegret(e.target.value)} />
+
+      <label className="diary-label">🧭 {t('다음엔 이렇게')}</label>
+      <textarea className="ta" rows="2" placeholder={t('다음 여행에서 꼭 해보고 싶은 것, 메모해둘 팁')}
+                value={nextTime} onChange={(e) => setNextTime(e.target.value)} />
+
+      <button disabled={busy} onClick={save}>{busy ? t('저장 중...') : t('일기 저장')}</button>
       {savedMsg && <span className="saved">{savedMsg}</span>}
       {feedback?.budgetDiff != null && (
         <p className="muted small-text">{t('예산 대비')}: {Number(feedback.budgetDiff).toLocaleString()}{t('원')}</p>

@@ -6,6 +6,7 @@ import com.travel.planner.trip.dto.TripCreateRequest;
 import com.travel.planner.trip.dto.TripResponse;
 import com.travel.planner.trip.entity.Trip;
 import com.travel.planner.trip.repository.TripRepository;
+import java.math.BigDecimal;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -23,6 +24,10 @@ public class TripService {
         Trip trip = Trip.builder()
                 .userId(userId)
                 .title(request.title())
+                .destinationName(request.destinationName())
+                .destinationLat(request.destinationLat())
+                .destinationLng(request.destinationLng())
+                .destinationPhoto(request.destinationPhoto())
                 .startDate(request.startDate())
                 .endDate(request.endDate())
                 .headcount(request.headcount())
@@ -52,6 +57,14 @@ public class TripService {
     public void delete(Long tripId, Long userId) {
         Trip trip = getOwnedTrip(tripId, userId);
         tripRepository.delete(trip);
+    }
+
+    /** 예산 한도 변경(가계부에서 직접). */
+    @Transactional
+    public TripResponse updateBudgetLimit(Long tripId, BigDecimal budgetLimit, Long userId) {
+        Trip trip = getOwnedTrip(tripId, userId);
+        trip.changeBudgetLimit(budgetLimit);
+        return TripResponse.from(trip);
     }
 
     /** 소유권 검증: 본인 여행이 아니면 403. 하위 리소스(일정/기록/숙박)의 접근 게이트로 공용 사용. */

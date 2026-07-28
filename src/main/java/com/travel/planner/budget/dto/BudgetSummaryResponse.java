@@ -21,6 +21,10 @@ public record BudgetSummaryResponse(
         BigDecimal liveRemaining,   // budgetLimit - liveTotal (한도 없으면 null)
         boolean liveOverBudget,     // 실집행이 한도를 초과했는가
         BigDecimal liveOverAmount,  // 실집행 초과 금액(초과 아닐 때 0)
-        Double usedRatio            // liveTotal / budgetLimit * 100 (한도 없거나 0이면 null)
+        Double usedRatio,           // liveTotal / budgetLimit * 100 (한도 없거나 0이면 null)
+        // ── 정산(1/N) ── 여러 명이 함께 가는 여행에서 각자 얼마씩 부담하는지
+        int headcount,              // 여행 인원
+        BigDecimal perPersonPlanned, // plannedTotal / headcount (인원 0이면 null)
+        BigDecimal perPersonLive     // liveTotal / headcount (인원 0이면 null)
 ) {
 }

@@ -18,8 +18,12 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class UserService {
 
+    /** 로그인 실패 문구. 프론트가 이 원문을 키로 번역하므로 바꾸면 translations.js 도 함께 고쳐야 한다. */
+    private static final String BAD_CREDENTIALS = "아이디 혹은 비밀번호가 틀렸습니다.";
+
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final com.travel.planner.trip.repository.TripRepository tripRepository;
 
     @Transactional
     public UserResponse create(UserCreateRequest request) {
@@ -39,17 +43,57 @@ public class UserService {
         return UserResponse.from(getEntity(id));
     }
 
+    /** 프로필 수정(닉네임·기본 출발지·아바타 프리셋). */
+    @Transactional
+    public UserResponse updateProfile(Long userId, String nickname, String defaultOrigin, String avatar) {
+        User user = getEntity(userId);
+        user.updateProfile(nickname, defaultOrigin, avatar);
+        return UserResponse.from(user);
+    }
+
+    /** 아바타 사진 업로드(직접 올린 이미지). */
+    @Transactional
+    public UserResponse changeAvatar(Long userId, String uploadedUrl) {
+        User user = getEntity(userId);
+        user.changeAvatar(uploadedUrl);
+        return UserResponse.from(user);
+    }
+
+    /** 비밀번호 변경(로컬 계정만). 현재 비밀번호가 맞아야 한다. */
+    @Transactional
+    public void changePassword(Long userId, String currentPassword, String newPassword) {
+        User user = getEntity(userId);
+        if (!user.isLocal() || user.getPasswordHash() == null) {
+            throw new IllegalStateException("소셜 로그인 계정은 비밀번호를 변경할 수 없습니다.");
+        }
+        if (!passwordEncoder.matches(currentPassword, user.getPasswordHash())) {
+            throw new InvalidCredentialsException("현재 비밀번호가 올바르지 않습니다.");
+        }
+        user.changePassword(passwordEncoder.encode(newPassword));
+    }
+
+    /** 회원 탈퇴 — 이 사용자의 여행(그리고 연쇄로 일정·기록·예약)까지 함께 삭제. */
+    @Transactional
+    public void deleteAccount(Long userId) {
+        User user = getEntity(userId);
+        // 여행 삭제 시 FK ON DELETE CASCADE(V12 등)로 하위 데이터가 함께 지워진다.
+        tripRepository.deleteAll(tripRepository.findByUserIdOrderByStartDateDesc(userId));
+        userRepository.delete(user);
+    }
+
+
     /**
      * 로컬(이메일/비밀번호) 로그인 검증. 성공 시 사용자 반환, 실패 시 401.
      */
     public User authenticateLocal(String email, String rawPassword) {
+        // 계정 없음과 비밀번호 틀림을 같은 문구로 돌려준다 — 가입 여부가 새어 나가지 않게(계정 열거 방지).
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new InvalidCredentialsException("이메일 또는 비밀번호가 올바르지 않습니다."));
+                .orElseThrow(() -> new InvalidCredentialsException(BAD_CREDENTIALS));
         if (user.getProvider() != AuthProvider.LOCAL || user.getPasswordHash() == null) {
             throw new InvalidCredentialsException(user.getProvider() + " 소셜 로그인으로 가입된 계정입니다. 소셜 버튼으로 로그인하세요.");
         }
         if (!passwordEncoder.matches(rawPassword, user.getPasswordHash())) {
-            throw new InvalidCredentialsException("이메일 또는 비밀번호가 올바르지 않습니다.");
+            throw new InvalidCredentialsException(BAD_CREDENTIALS);
         }
         return user;
     }

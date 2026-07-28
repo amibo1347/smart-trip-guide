@@ -16,6 +16,8 @@ import java.time.LocalDateTime;
  */
 public record MomentRequest(
         @NotBlank String clientUuid,
+        // 이 기록을 붙일 일정 항목(노선도의 장소). 없으면 특정 장소와 무관한 일반 기록.
+        Long planItemId,
         @NotNull LocalDateTime recordedAt,
         @DecimalMin("-90.0") @DecimalMax("90.0") BigDecimal latitude,
         @DecimalMin("-180.0") @DecimalMax("180.0") BigDecimal longitude,

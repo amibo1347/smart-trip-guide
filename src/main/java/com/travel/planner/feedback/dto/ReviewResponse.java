@@ -31,6 +31,7 @@ public record ReviewResponse(
                                 String mood, BigDecimal amount, String memo, String photoUrl) {
     }
 
-    public record FeedbackView(Integer overallScore, BigDecimal budgetDiff, String comment) {
+    public record FeedbackView(Integer overallScore, BigDecimal budgetDiff, String comment,
+                               String liked, String regret, String nextTime) {
     }
 }

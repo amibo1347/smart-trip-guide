@@ -48,6 +48,10 @@ public class TripBooking extends BaseEntity {
     @Column(name = "image_url", length = 1000)
     private String imageUrl;
 
+    /** 예약 확인증 파일(항공권 e-티켓·숙소 바우처). 이미지 또는 PDF. null 이면 미첨부. */
+    @Column(name = "ticket_url", length = 500)
+    private String ticketUrl;
+
     @Column(name = "start_date")
     private LocalDate startDate;
 
@@ -69,5 +73,15 @@ public class TripBooking extends BaseEntity {
         this.startDate = startDate;
         this.endDate = endDate;
         this.memo = memo;
+    }
+
+    /** 예약 확인증 첨부/교체. */
+    public void attachTicket(String url) {
+        this.ticketUrl = url;
+    }
+
+    /** 예약 확인증 제거. */
+    public void removeTicket() {
+        this.ticketUrl = null;
     }
 }

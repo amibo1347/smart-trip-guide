@@ -53,6 +53,14 @@ gemini:
   api-key: ${GEMINI_API_KEY:}
   model: ${GEMINI_MODEL:gemini-2.5-flash-lite}
 
+# 장소 탐색(사진·평점·리뷰수·주소). 키가 없으면 OSM+위키백과로 자동 폴백하므로 앱은 그대로 동작한다.
+google:
+  places:
+    api-key: ${GOOGLE_PLACES_API_KEY:}
+    # 앱 자체 일일 호출 상한(청구 사고 방지). 넘으면 무료 소스로 자동 폴백한다.
+    # Cloud Console 할당량과 이중으로 건다. 개인 사용은 하루 수십 건이면 충분.
+    daily-limit: ${GOOGLE_PLACES_DAILY_LIMIT:300}
+
 # 기록 사진 저장 위치(서버 로컬 파일). /uploads/** 로 정적 서빙. 운영은 UPLOAD_DIR 로 오버라이드.
 app:
   upload-dir: ${UPLOAD_DIR:./uploads}

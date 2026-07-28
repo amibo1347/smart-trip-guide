@@ -17,7 +17,10 @@ Write-Host "[2/4] .env 로드..." -ForegroundColor Cyan
 $envFile = Join-Path $PSScriptRoot '.env'
 $envLoaded = Test-Path $envFile
 if ($envLoaded) {
-    Get-Content $envFile | ForEach-Object {
+    # -Encoding UTF8 필수. Windows PowerShell 5.1 은 인코딩을 안 주면 ANSI(한국어 환경 CP949)로 읽는데,
+    # 한글 주석 줄 끝의 멀티바이트 문자가 CRLF 를 트레일 바이트로 삼켜 '다음 줄이 주석에 합쳐져' 사라진다.
+    # (이 때문에 KAKAO_CLIENT_ID 가 통째로 누락돼 kakao 프로필이 활성화되지 않았다.)
+    Get-Content $envFile -Encoding UTF8 | ForEach-Object {
         $line = $_.Trim()
         if ($line -and -not $line.StartsWith('#') -and $line.Contains('=')) {
             $idx = $line.IndexOf('=')

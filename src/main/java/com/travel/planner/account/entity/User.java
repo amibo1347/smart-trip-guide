@@ -37,6 +37,14 @@ public class User extends BaseEntity {
     @Column(nullable = false, length = 50)
     private String nickname;
 
+    /** 기본 출발지(AI 일정 생성의 출발지 기본값). 없으면 화면에서 빈칸/서울. */
+    @Column(name = "default_origin", length = 50)
+    private String defaultOrigin;
+
+    /** 프로필 아바타. "preset:xxx"(기본 제공) 또는 "/uploads/.."(업로드). null 이면 기본 캐릭터. */
+    @Column(length = 500)
+    private String avatar;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private AuthProvider provider;
@@ -66,5 +74,32 @@ public class User extends BaseEntity {
 
     public void changeNickname(String nickname) {
         this.nickname = nickname;
+    }
+
+    /** 프로필 수정(닉네임·기본 출발지·아바타). null 인 필드는 그대로 둔다. */
+    public void updateProfile(String nickname, String defaultOrigin, String avatar) {
+        if (nickname != null && !nickname.isBlank()) {
+            this.nickname = nickname.trim();
+        }
+        if (defaultOrigin != null) {
+            this.defaultOrigin = defaultOrigin.isBlank() ? null : defaultOrigin.trim();
+        }
+        if (avatar != null) {
+            this.avatar = avatar.isBlank() ? null : avatar;
+        }
+    }
+
+    /** 아바타 교체(업로드한 사진 URL). */
+    public void changeAvatar(String avatar) {
+        this.avatar = avatar;
+    }
+
+    /** 비밀번호 변경(로컬 계정). */
+    public void changePassword(String newHash) {
+        this.passwordHash = newHash;
+    }
+
+    public boolean isLocal() {
+        return this.provider == AuthProvider.LOCAL;
     }
 }

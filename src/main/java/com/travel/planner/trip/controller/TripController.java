@@ -13,6 +13,9 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import jakarta.validation.constraints.PositiveOrZero;
+import java.math.BigDecimal;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -46,6 +49,16 @@ public class TripController {
     @GetMapping
     public List<TripResponse> list(Authentication auth) {
         return tripService.listByUser(currentUser.requireId(auth));
+    }
+
+    /** 예산 한도 설정/변경(가계부에서 직접). null 이면 한도 해제. */
+    @PatchMapping("/{id}/budget-limit")
+    public TripResponse updateBudgetLimit(@PathVariable Long id,
+                                          @Valid @RequestBody BudgetLimitRequest req, Authentication auth) {
+        return tripService.updateBudgetLimit(id, req.budgetLimit(), currentUser.requireId(auth));
+    }
+
+    public record BudgetLimitRequest(@PositiveOrZero BigDecimal budgetLimit) {
     }
 
     /** 여행 삭제(소프트 삭제). */

@@ -18,6 +18,8 @@ import org.springframework.web.multipart.MultipartFile;
 public class PhotoStorageService {
 
     private static final Set<String> ALLOWED_EXT = Set.of(".jpg", ".jpeg", ".png", ".webp", ".gif");
+    /** 예약 확인증 등 문서: 이미지 + PDF 허용. */
+    private static final Set<String> DOC_EXT = Set.of(".jpg", ".jpeg", ".png", ".webp", ".gif", ".pdf");
 
     private final Path root;
 
@@ -48,7 +50,29 @@ public class PhotoStorageService {
         return "/uploads/" + name;
     }
 
-    /** 저장된 사진 파일 삭제. URL이 아니거나 경로 이탈이면 무시. */
+    /**
+     * 예약 확인증 등 문서 저장. 이미지 + PDF 허용. 파일이 비었으면 null.
+     */
+    public String storeDocument(MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            return null;
+        }
+        String contentType = file.getContentType();
+        boolean ok = contentType != null
+                && (contentType.startsWith("image/") || contentType.equals("application/pdf"));
+        if (!ok) {
+            throw new IllegalArgumentException("이미지 또는 PDF 파일만 첨부할 수 있습니다.");
+        }
+        String name = UUID.randomUUID().toString().replace("-", "") + docExtensionOf(file.getOriginalFilename());
+        try {
+            file.transferTo(root.resolve(name));
+        } catch (IOException e) {
+            throw new IllegalStateException("파일 저장 실패: " + e.getMessage(), e);
+        }
+        return "/uploads/" + name;
+    }
+
+    /** 저장된 파일 삭제. URL이 아니거나 경로 이탈이면 무시. (사진·문서 공용) */
     public void delete(String photoUrl) {
         if (photoUrl == null || !photoUrl.startsWith("/uploads/")) {
             return;
@@ -62,6 +86,19 @@ public class PhotoStorageService {
         } catch (IOException ignored) {
             // 파일 삭제 실패는 치명적이지 않음 — 레코드 삭제는 진행
         }
+    }
+
+    private static String docExtensionOf(String filename) {
+        if (filename != null) {
+            int dot = filename.lastIndexOf('.');
+            if (dot >= 0) {
+                String ext = filename.substring(dot).toLowerCase();
+                if (DOC_EXT.contains(ext)) {
+                    return ext;
+                }
+            }
+        }
+        return ".jpg";
     }
 
     private static String extensionOf(String filename) {

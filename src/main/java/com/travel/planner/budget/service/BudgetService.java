@@ -30,6 +30,7 @@ public class BudgetService {
     private final PlanRepository planRepository;
     private final TripBookingRepository bookingRepository;
     private final TripMomentRepository momentRepository;
+    private final com.travel.planner.expense.repository.ExpenseRepository expenseRepository;
 
     public BudgetSummaryResponse getSummary(Long tripId, Long userId) {
         Trip trip = tripService.getOwnedTrip(tripId, userId);
@@ -57,9 +58,11 @@ public class BudgetService {
         boolean overBudget = remaining != null && remaining.signum() < 0;
         BigDecimal overAmount = overBudget ? remaining.negate() : BigDecimal.ZERO;
 
-        // 여행 중 실시간 집행: 확정 예약(이미 결제) + 실제 지출(moments) vs 한도
+        // 여행 중 실시간 집행: 확정 예약(이미 결제) + 실제 지출(moments + 가계부) vs 한도
         BigDecimal actualSpent = momentRepository.sumAmountByTripId(tripId);
         if (actualSpent == null) actualSpent = BigDecimal.ZERO;
+        BigDecimal ledger = expenseRepository.sumAmountByTripId(tripId);
+        if (ledger != null) actualSpent = actualSpent.add(ledger);
         BigDecimal liveTotal = bookingTotal.add(actualSpent);
         BigDecimal liveRemaining = limit == null ? null : limit.subtract(liveTotal);
         boolean liveOverBudget = liveRemaining != null && liveRemaining.signum() < 0;
@@ -68,8 +71,16 @@ public class BudgetService {
                 : liveTotal.multiply(BigDecimal.valueOf(100))
                         .divide(limit, 1, RoundingMode.HALF_UP).doubleValue();
 
+        // 정산(1/N): 인원수로 나눈 1인당 부담액. 원 단위 반올림(잔돈까지 나누지 않음).
+        int headcount = trip.getHeadcount();
+        BigDecimal perPersonPlanned = headcount <= 0 ? null
+                : plannedTotal.divide(BigDecimal.valueOf(headcount), 0, RoundingMode.HALF_UP);
+        BigDecimal perPersonLive = headcount <= 0 ? null
+                : liveTotal.divide(BigDecimal.valueOf(headcount), 0, RoundingMode.HALF_UP);
+
         return new BudgetSummaryResponse(
                 limit, activityTotal, bookingTotal, plannedTotal, remaining, overBudget, overAmount,
-                actualSpent, liveTotal, liveRemaining, liveOverBudget, liveOverAmount, usedRatio);
+                actualSpent, liveTotal, liveRemaining, liveOverBudget, liveOverAmount, usedRatio,
+                headcount, perPersonPlanned, perPersonLive);
     }
 }

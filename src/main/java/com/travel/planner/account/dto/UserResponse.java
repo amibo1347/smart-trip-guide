@@ -11,11 +11,13 @@ public record UserResponse(
         Long id,
         String email,
         String nickname,
+        String defaultOrigin,
+        String avatar,
         AuthProvider provider,
         LocalDateTime createdAt
 ) {
     public static UserResponse from(User user) {
         return new UserResponse(user.getId(), user.getEmail(), user.getNickname(),
-                user.getProvider(), user.getCreatedAt());
+                user.getDefaultOrigin(), user.getAvatar(), user.getProvider(), user.getCreatedAt());
     }
 }

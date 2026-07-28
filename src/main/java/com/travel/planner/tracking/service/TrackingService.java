@@ -43,6 +43,7 @@ public class TrackingService {
         }
         TripMoment saved = momentRepo.save(TripMoment.builder()
                 .tripId(tripId)
+                .planItemId(req.planItemId())
                 .clientUuid(req.clientUuid())
                 .recordedAt(req.recordedAt())
                 .latitude(req.latitude())

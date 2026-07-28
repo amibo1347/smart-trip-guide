@@ -6,6 +6,9 @@ import { VitePWA } from 'vite-plugin-pwa'
 const BACKEND = process.env.VITE_BACKEND ?? 'http://localhost:8082'
 
 export default defineConfig({
+  // .env 는 저장소 루트에 하나만 둔다(백엔드와 공용). 이걸 지정하지 않으면 Vite 가
+  // frontend/.env 만 찾아 VITE_* 변수가 undefined 로 들어온다.
+  envDir: '..',
   plugins: [
     react(),
     VitePWA({

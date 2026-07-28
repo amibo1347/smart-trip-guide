@@ -54,6 +54,7 @@ export const api = {
   // Planning
   getPlan: (tripId) => request('GET', `/api/trips/${tripId}/plan`),
   generatePlan: (tripId, payload) => request('POST', `/api/trips/${tripId}/plan/generate`, payload),
+  suggestDay: (tripId, dayId) => request('POST', `/api/trips/${tripId}/plan-days/${dayId}/suggest`),
   bookingLinks: (tripId, origin) => request('GET', `/api/trips/${tripId}/booking-links${origin ? `?origin=${encodeURIComponent(origin)}` : ''}`),
   linkTitle: (url) => request('POST', '/api/link-title', { url }), // 예약 링크에서 이름만 가져오기
   listBookings: (tripId) => request('GET', `/api/trips/${tripId}/bookings`),
@@ -65,20 +66,65 @@ export const api = {
     return upload('POST', `/api/trips/${tripId}/bookings`, fd)
   },
   deleteBooking: (id) => request('DELETE', `/api/bookings/${id}`),
+  // 예약 확인증(항공권·바우처, 이미지/PDF)
+  attachTicket: (bookingId, file) => {
+    const fd = new FormData()
+    fd.append('file', file)
+    return upload('POST', `/api/bookings/${bookingId}/ticket`, fd)
+  },
+  removeTicket: (bookingId) => request('DELETE', `/api/bookings/${bookingId}/ticket`),
   addPlanItem: (dayId, payload) => request('POST', `/api/plan-days/${dayId}/items`, payload),
   updatePlanItem: (itemId, payload) => request('PATCH', `/api/plan-items/${itemId}`, payload), // 제목/시간/예상비용 편집
   deletePlanItem: (itemId) => request('DELETE', `/api/plan-items/${itemId}`),
   movePlanItem: (itemId, direction) => request('PATCH', `/api/plan-items/${itemId}/move?direction=${direction}`),
   getBudget: (tripId) => request('GET', `/api/trips/${tripId}/budget`), // 계획 단계 예산 점검
+  setBudgetLimit: (tripId, budgetLimit) => request('PATCH', `/api/trips/${tripId}/budget-limit`, { budgetLimit }),
+  // 가계부(지출 내역) + N빵 정산
+  listExpenses: (tripId) => request('GET', `/api/trips/${tripId}/expenses`),
+  addExpense: (tripId, payload) => request('POST', `/api/trips/${tripId}/expenses`, payload),
+  updateExpense: (id, payload) => request('PUT', `/api/expenses/${id}`, payload),
+  deleteExpense: (id) => request('DELETE', `/api/expenses/${id}`),
   getCurrency: (tripId) => request('GET', `/api/trips/${tripId}/currency`), // 목적지 통화·환율(원화+외화 병기)
   // 읽기 전용 공유
   enableShare: (tripId) => request('POST', `/api/trips/${tripId}/share`),
   disableShare: (tripId) => request('DELETE', `/api/trips/${tripId}/share`),
   getShared: (token) => request('GET', `/api/shared/${token}`),
+  // 장소 탐색 (인기/주변/검색) — 목적지 좌표 기준
+  discoveryStatus: () => request('GET', '/api/discovery/status'),
+  popularPlaces: (lat, lng, opts = {}) =>
+    request('GET', `/api/discovery/popular?lat=${lat}&lng=${lng}&radiusKm=${opts.radiusKm ?? 15}&limit=${opts.limit ?? 10}&lang=${opts.lang ?? 'ko'}`),
+  nearbyPlaces: (lat, lng, category, opts = {}) =>
+    request('GET', `/api/discovery/nearby?lat=${lat}&lng=${lng}&category=${category}&radiusKm=${opts.radiusKm ?? 10}&limit=${opts.limit ?? 12}&lang=${opts.lang ?? 'ko'}`),
+  searchPlacesRich: (q, lang = 'ko') =>
+    request('GET', `/api/discovery/search?q=${encodeURIComponent(q)}&lang=${lang}`),
+  // 여행 날짜별 날씨 (Open-Meteo, 목적지 좌표 기준)
+  getWeather: (tripId) => request('GET', `/api/trips/${tripId}/weather`),
+  // 일정 기반 노선도 (장소별 기록은 아래 recordMoment 에 planItemId 를 넣어 재사용)
+  getRoute: (tripId) => request('GET', `/api/trips/${tripId}/route`),
+  // 위치 수동 지정 / 자동 재탐색 / 장소 검색
+  setItemPlace: (itemId, payload) => request('PATCH', `/api/plan-items/${itemId}/place`, payload),
+  autoLocateItem: (itemId) => request('POST', `/api/plan-items/${itemId}/place/auto`),
+  searchPlaces: (q) => request('GET', `/api/places/search?q=${encodeURIComponent(q)}`),
+  // 준비물 체크리스트
+  listChecklist: (tripId) => request('GET', `/api/trips/${tripId}/checklist`),
+  addChecklistItem: (tripId, payload) => request('POST', `/api/trips/${tripId}/checklist`, payload),
+  presetChecklist: (tripId, overseas) => request('POST', `/api/trips/${tripId}/checklist/preset?overseas=${overseas ? 'true' : 'false'}`),
+  updateChecklistItem: (itemId, payload) => request('PATCH', `/api/checklist-items/${itemId}`, payload),
+  deleteChecklistItem: (itemId) => request('DELETE', `/api/checklist-items/${itemId}`),
   // Auth
   me: () => request('GET', '/api/auth/me'),
   login: (payload) => request('POST', '/api/auth/login', payload),
   logout: () => request('POST', '/logout'),
+  // 마이페이지
+  updateProfile: (payload) => request('PATCH', '/api/users/me', payload),
+  changePassword: (payload) => request('PATCH', '/api/users/me/password', payload),
+  uploadAvatar: (file) => {
+    const fd = new FormData()
+    fd.append('file', file)
+    return upload('POST', '/api/users/me/avatar', fd)
+  },
+  myOverview: () => request('GET', '/api/users/me/overview'),
+  deleteAccount: () => request('DELETE', '/api/users/me'),
   // Tracking (여행 중 통합 기록: 위치+기분+지출+메모+사진)
   listMoments: (tripId) => request('GET', `/api/trips/${tripId}/moments`),
   momentSummary: (tripId) => request('GET', `/api/trips/${tripId}/moments/summary`),

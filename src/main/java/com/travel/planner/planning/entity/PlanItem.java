@@ -80,6 +80,11 @@ public class PlanItem extends BaseEntity {
         this.planDay = planDay;
     }
 
+    /** 장소 연결(수동 위치 지정 시 장소가 없던 항목에 새로 붙이는 용도). */
+    public void changePlace(Place place) {
+        this.place = place;
+    }
+
     public void changeSortOrder(int sortOrder) {
         this.sortOrder = sortOrder;
     }

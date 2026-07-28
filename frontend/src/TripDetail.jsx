@@ -1,90 +1,104 @@
 import { useState } from 'react'
 import { api } from './api.js'
 import Itinerary from './Itinerary.jsx'
+import Checklist from './Checklist.jsx'
 import Tracking from './Tracking.jsx'
 import Review from './Review.jsx'
+import TripWallet from './TripWallet.jsx'
+import ShareSheet from './ShareSheet.jsx'
 import { useI18n } from './i18n/index.jsx'
-import { copyToClipboard, shareOrCopy } from './utils/clipboard.js'
 
 /**
  * 여행 상세 화면. 탭으로 [일정(여행 전)] / [기록(여행 중)] / [복기] 전환.
  */
-export default function TripDetail({ trip, onBack, onError }) {
+export default function TripDetail({ trip, defaultOrigin, onBack, onError }) {
   const { t } = useI18n()
   const [tab, setTab] = useState('plan')
 
   return (
     <div>
-      <button className="link" onClick={onBack}>← {t('내 여행으로')}</button>
+      <button className="link back" onClick={onBack}>← {t('내 여행으로')}</button>
 
-      <section className="card">
-        <h2>🗺 {trip.title}</h2>
-        <p className="muted">
-          {trip.startDate} ~ {trip.endDate} · 👥 {trip.headcount}{t('명')}
-          {trip.concept && <> · 🏷 {trip.concept}</>}
+      <section className="card hero">
+        <h2 className="hero-title">{trip.title}</h2>
+        <p className="hero-meta">
+          <span>📅 {trip.startDate} ~ {trip.endDate}</span>
+          <span>👥 {trip.headcount}{t('명')}</span>
+          {trip.concept && <span>🏷 {trip.concept}</span>}
         </p>
         <SharePanel trip={trip} onError={onError} />
-        <div className="tabs">
-          <button className={tab === 'plan' ? 'tab active' : 'tab'} onClick={() => setTab('plan')}>📋 {t('일정')}</button>
-          <button className={tab === 'track' ? 'tab active' : 'tab'} onClick={() => setTab('track')}>📍 {t('기록')}</button>
-          <button className={tab === 'review' ? 'tab active' : 'tab'} onClick={() => setTab('review')}>📊 {t('복기')}</button>
-        </div>
       </section>
 
-      {tab === 'plan' && <Itinerary trip={trip} onError={onError} />}
+      <div className="tabs">
+        <button className={tab === 'plan' ? 'tab active' : 'tab'} onClick={() => setTab('plan')}>📋 {t('일정')}</button>
+        <button className={tab === 'wallet' ? 'tab active' : 'tab'} onClick={() => setTab('wallet')}>💼 {t('지갑')}</button>
+        <button className={tab === 'pack' ? 'tab active' : 'tab'} onClick={() => setTab('pack')}>🎒 {t('준비물')}</button>
+        <button className={tab === 'track' ? 'tab active' : 'tab'} onClick={() => setTab('track')}>📍 {t('기록')}</button>
+        <button className={tab === 'review' ? 'tab active' : 'tab'} onClick={() => setTab('review')}>📊 {t('복기')}</button>
+      </div>
+
+      {tab === 'plan' && <Itinerary trip={trip} defaultOrigin={defaultOrigin} onError={onError} />}
+      {tab === 'wallet' && <TripWallet trip={trip} onError={onError} />}
+      {tab === 'pack' && <Checklist trip={trip} onError={onError} />}
       {tab === 'track' && <Tracking trip={trip} onError={onError} />}
       {tab === 'review' && <Review trip={trip} onError={onError} />}
     </div>
   )
 }
 
-/** 일정 읽기 전용 공유: 링크 발급 → 복사/공유하기/PDF용 열기/공유 끄기. */
+/**
+ * 읽기 전용 공유 링크 발급 → SNS 공유 시트 열기.
+ * 이미 공유 중인 여행(trip.shareToken)은 발급 없이 바로 시트를 연다.
+ */
 function SharePanel({ trip, onError }) {
   const { t } = useI18n()
-  const [url, setUrl] = useState(null)
+  const [token, setToken] = useState(trip.shareToken ?? null)
+  const [open, setOpen] = useState(false)
   const [busy, setBusy] = useState(false)
 
-  async function enable() {
+  const url = token ? `${window.location.origin}/share/${token}` : null
+  const subtitle = `${trip.startDate} ~ ${trip.endDate} · ${trip.headcount}${t('명')}`
+
+  async function openSheet() {
+    if (token) { setOpen(true); return }
     setBusy(true)
     try {
       const r = await api.enableShare(trip.id)
-      setUrl(window.location.origin + r.path)
+      setToken(r.token)
+      trip.shareToken = r.token // 목록으로 돌아갔다 다시 들어와도 공유 상태 유지
+      setOpen(true)
     } catch (e) { onError(e.message) } finally { setBusy(false) }
   }
+
   async function disable() {
     if (!window.confirm(t('공유를 끄면 기존 링크가 즉시 무효화됩니다. 진행할까요?'))) return
     setBusy(true)
-    try { await api.disableShare(trip.id); setUrl(null) }
-    catch (e) { onError(e.message) } finally { setBusy(false) }
-  }
-  async function share() {
-    if (!url) return
-    const r = await shareOrCopy({ title: trip.title, url, promptMsg: t('아래 링크를 복사하세요') })
-    if (r === 'copied') alert(t('링크가 복사되었습니다.'))
-  }
-  async function copy() {
-    if (await copyToClipboard(url, t('아래 링크를 복사하세요'))) alert(t('링크가 복사되었습니다.'))
+    try {
+      await api.disableShare(trip.id)
+      setToken(null)
+      trip.shareToken = null
+      setOpen(false)
+    } catch (e) { onError(e.message) } finally { setBusy(false) }
   }
 
-  if (!url) {
-    return (
-      <div className="share-actions">
-        <button className="small" onClick={enable} disabled={busy}>{busy ? '...' : `🔗 ${t('일정 공유')}`}</button>
-      </div>
-    )
-  }
   return (
-    <div className="share-box">
-      <div className="row">
-        <input style={{ flex: 1 }} readOnly value={url} onFocus={(e) => e.target.select()} />
-        <button type="button" className="small" onClick={copy}>{t('복사')}</button>
+    <>
+      <div className="hero-actions">
+        <button className="btn-share" onClick={openSheet} disabled={busy}>
+          {busy ? t('링크 만드는 중...') : <>🔗 {t('일정 공유하기')}</>}
+        </button>
+        {token && <span className="live-dot">{t('공유 중')}</span>}
       </div>
-      <div className="share-actions">
-        <button className="small" onClick={share}>📤 {t('공유하기')}</button>
-        <a className="small btn-like" href={url} target="_blank" rel="noreferrer">🖨 {t('PDF용 열기 ↗')}</a>
-        <button className="small ghost" onClick={disable} disabled={busy}>{t('공유 끄기')}</button>
-      </div>
-      <p className="muted small-text">{t('이 링크로 누구나 읽기 전용 일정을 볼 수 있어요. 카톡·문자에 붙여넣어 공유하세요.')}</p>
-    </div>
+
+      {open && url && (
+        <ShareSheet
+          url={url}
+          title={trip.title}
+          subtitle={subtitle}
+          onClose={() => setOpen(false)}
+          onDisable={disable}
+        />
+      )}
+    </>
   )
 }

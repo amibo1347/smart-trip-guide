@@ -12,12 +12,14 @@ public record BookingResponse(
         BigDecimal price,
         String bookingUrl,
         String imageUrl,
+        String ticketUrl,
         LocalDate startDate,
         LocalDate endDate,
         String memo
 ) {
     public static BookingResponse from(TripBooking b) {
         return new BookingResponse(b.getId(), b.getType(), b.getTitle(), b.getPrice(),
-                b.getBookingUrl(), b.getImageUrl(), b.getStartDate(), b.getEndDate(), b.getMemo());
+                b.getBookingUrl(), b.getImageUrl(), b.getTicketUrl(),
+                b.getStartDate(), b.getEndDate(), b.getMemo());
     }
 }

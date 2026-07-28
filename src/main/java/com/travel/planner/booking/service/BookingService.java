@@ -53,6 +53,34 @@ public class BookingService {
         return BookingResponse.from(saved);
     }
 
+    /** 예약 확인증(이미지/PDF) 첨부·교체. 기존 확인증이 있으면 파일을 지우고 새로 저장. */
+    @Transactional
+    public BookingResponse attachTicket(Long bookingId, org.springframework.web.multipart.MultipartFile file, Long userId) {
+        TripBooking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new NotFoundException("예약을 찾을 수 없습니다: " + bookingId));
+        tripService.getOwnedTrip(booking.getTripId(), userId);
+        String url = photoStorage.storeDocument(file);
+        if (url == null) {
+            throw new IllegalArgumentException("확인증 파일이 없습니다.");
+        }
+        if (booking.getTicketUrl() != null) {
+            photoStorage.delete(booking.getTicketUrl()); // 이전 확인증 파일 정리
+        }
+        booking.attachTicket(url);
+        return BookingResponse.from(booking);
+    }
+
+    @Transactional
+    public void removeTicket(Long bookingId, Long userId) {
+        TripBooking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new NotFoundException("예약을 찾을 수 없습니다: " + bookingId));
+        tripService.getOwnedTrip(booking.getTripId(), userId);
+        if (booking.getTicketUrl() != null) {
+            photoStorage.delete(booking.getTicketUrl());
+            booking.removeTicket();
+        }
+    }
+
     @Transactional
     public void delete(Long bookingId, Long userId) {
         TripBooking booking = bookingRepository.findById(bookingId)
@@ -60,6 +88,7 @@ public class BookingService {
         tripService.getOwnedTrip(booking.getTripId(), userId);
         planService.removeBookingItems(booking.getId()); // 이 예약에서 생성된 일정 항목도 정리
         photoStorage.delete(booking.getImageUrl()); // 직접 올린 사진(/uploads/..)이면 파일도 정리
+        photoStorage.delete(booking.getTicketUrl()); // 확인증 파일도 정리
         bookingRepository.delete(booking);
     }
 }

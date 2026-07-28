@@ -42,16 +42,18 @@ public class AuthController {
     public AuthStatus login(@Valid @RequestBody LoginRequest req,
                             HttpServletRequest request, HttpServletResponse response) {
         User user = userService.authenticateLocal(req.email(), req.password());
+        establishSession(user.getEmail(), request, response);
+        return new AuthStatus(true, UserResponse.from(user));
+    }
 
-        // 세션에 인증 컨텍스트 저장 (이후 요청은 세션 쿠키로 식별)
+    /** 세션에 인증 컨텍스트 저장 (이후 요청은 세션 쿠키로 식별). principal = 이메일. */
+    private void establishSession(String email, HttpServletRequest request, HttpServletResponse response) {
         Authentication auth = UsernamePasswordAuthenticationToken.authenticated(
-                user.getEmail(), null, List.of(new SimpleGrantedAuthority("ROLE_USER")));
+                email, null, List.of(new SimpleGrantedAuthority("ROLE_USER")));
         SecurityContext context = SecurityContextHolder.createEmptyContext();
         context.setAuthentication(auth);
         SecurityContextHolder.setContext(context);
         securityContextRepository.saveContext(context, request, response);
-
-        return new AuthStatus(true, UserResponse.from(user));
     }
 
     @GetMapping("/me")

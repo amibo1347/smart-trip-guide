@@ -43,11 +43,12 @@ public class ReviewService {
     private final PlanItemActualRepository actualRepository;
     private final TripFeedbackRepository feedbackRepository;
     private final TripMomentRepository momentRepository;
+    private final com.travel.planner.expense.repository.ExpenseRepository expenseRepository;
 
     public ReviewResponse getReview(Long tripId, Long userId) {
         Trip trip = tripService.getOwnedTrip(tripId, userId);
 
-        // 통합 기록 집계(지출/위치/기분을 한 테이블에서)
+        // 통합 기록 집계(지출/위치/기분을 한 테이블에서) + 가계부 지출
         List<TripMoment> moments = momentRepository.findByTripIdOrderByRecordedAtDesc(tripId);
         BigDecimal actualSpent = BigDecimal.ZERO;
         Map<String, BigDecimal> byCategory = new LinkedHashMap<>();
@@ -57,6 +58,11 @@ public class ReviewService {
                 String cat = m.getCategory() == null ? "기타" : m.getCategory();
                 byCategory.merge(cat, m.getAmount(), BigDecimal::add);
             }
+        }
+        for (com.travel.planner.expense.entity.Expense e : expenseRepository.findByTripIdOrderBySpentOnDescIdDesc(tripId)) {
+            actualSpent = actualSpent.add(e.getAmount());
+            String cat = (e.getCategory() == null || e.getCategory().isBlank()) ? "기타" : e.getCategory();
+            byCategory.merge(cat, e.getAmount(), BigDecimal::add);
         }
 
         // 계획 항목 + 실제(visited/cost/satisfaction)
@@ -107,7 +113,8 @@ public class ReviewService {
                 : trip.getBudgetLimit().subtract(actualSpent);
 
         FeedbackView feedbackView = feedbackRepository.findByTripId(tripId)
-                .map(f -> new FeedbackView(f.getOverallScore(), f.getBudgetDiff(), f.getComment()))
+                .map(f -> new FeedbackView(f.getOverallScore(), f.getBudgetDiff(), f.getComment(),
+                        f.getLiked(), f.getRegret(), f.getNextTime()))
                 .orElse(null);
 
         return new ReviewResponse(
@@ -135,14 +142,17 @@ public class ReviewService {
         BigDecimal actualSpent = momentRepository.findByTripIdOrderByRecordedAtDesc(tripId).stream()
                 .map(TripMoment::getAmount)
                 .filter(java.util.Objects::nonNull)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+                .reduce(BigDecimal.ZERO, BigDecimal::add)
+                .add(expenseRepository.sumAmountByTripId(tripId));
         BigDecimal budgetDiff = trip.getBudgetLimit() == null ? null
                 : trip.getBudgetLimit().subtract(actualSpent);
 
         TripFeedback feedback = feedbackRepository.findByTripId(tripId)
                 .orElseGet(() -> TripFeedback.builder().tripId(tripId).build());
-        feedback.update(req.overallScore(), budgetDiff, req.comment());
+        feedback.update(req.overallScore(), budgetDiff, req.comment(),
+                req.liked(), req.regret(), req.nextTime());
         TripFeedback saved = feedbackRepository.save(feedback);
-        return new FeedbackView(saved.getOverallScore(), saved.getBudgetDiff(), saved.getComment());
+        return new FeedbackView(saved.getOverallScore(), saved.getBudgetDiff(), saved.getComment(),
+                saved.getLiked(), saved.getRegret(), saved.getNextTime());
     }
 }
