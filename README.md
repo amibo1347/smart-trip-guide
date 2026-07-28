@@ -4,7 +4,7 @@
 Spring Boot 백엔드 하나가 React PWA 프론트까지 함께 서빙하는 단일 서비스 구조이고,
 폰에서 홈 화면에 설치해 GPS·카메라·마이크를 그대로 쓸 수 있게 PWA로 만들었습니다.
 
-**운영 주소:** https://smart-trip-guide-production.up.railway.app
+**운영 주소:** https://smart-planner.o-r.kr
 
 ## 스택
 
@@ -103,8 +103,8 @@ npm run dev               # Vite dev server (백엔드로 프록시)
 
 ## 배포
 
-- **Railway** (현재 운영) — 리포의 `Dockerfile` 자동 감지 + MySQL 플러그인. [DEPLOY.md](./DEPLOY.md)
-- **Oracle Cloud Always Free VM** — `docker-compose.prod.yml` 로 앱 + MySQL + Caddy(자동 HTTPS) 단일 VM 구성. [DEPLOY-oracle.md](./DEPLOY-oracle.md)
+- **Oracle Cloud Always Free VM** (현재 운영) — `docker-compose.prod.yml` 로 앱 + MySQL + Caddy(자동 HTTPS)를 단일 VM에 구성. [DEPLOY-oracle.md](./DEPLOY-oracle.md)
+- **Railway** — 리포의 `Dockerfile` 자동 감지 + MySQL 플러그인. [DEPLOY.md](./DEPLOY.md)
 
 헬스체크 경로는 `/api/health` 입니다.
 
