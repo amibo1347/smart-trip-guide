@@ -1,0 +1,100 @@
+# =====================================================================
+# 1GB AMD Micro(VM.Standard.E2.1.Micro) 전용 배포.
+#  - app   : VM 에서 빌드하지 않고, 로컬 PC 에서 빌드해 GHCR 에 올린 이미지를 받아서 실행
+#  - mysql : 1GB 에 맞춰 메모리 튜닝(buffer pool 축소, performance_schema off)
+#  - caddy : 리버스 프록시 + 자동 HTTPS
+# 사용:
+#   1) (로컬) docker build --platform linux/amd64 -t ghcr.io/amibo1347/smart-trip-guide:latest .
+#            docker push ghcr.io/amibo1347/smart-trip-guide:latest
+#   2) (VM)  swap 4G 추가 후  →  docker compose -f docker-compose.micro.yml up -d
+# 자세한 절차: DEPLOY-oracle-micro.md
+# =====================================================================
+
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: stp-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
+      MYSQL_DATABASE: ${DB_NAME}
+      TZ: Asia/Seoul
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      # ── 1GB 메모리 절약 튜닝 ──
+      - --innodb-buffer-pool-size=64M
+      - --performance-schema=OFF
+      - --max-connections=30
+      - --innodb-flush-method=O_DIRECT
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-p${DB_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    networks: [internal]
+
+  app:
+    # VM 에서 build 하지 않고 GHCR 이미지를 pull 해서 실행(1GB 라 VM 빌드 불가)
+    image: ghcr.io/amibo1347/smart-trip-guide:latest
+    container_name: stp-app
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy   # DB 준비된 뒤 기동
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      SERVER_PORT: "8082"
+      TZ: Asia/Seoul
+      # ── 1GB VM: JVM 힙을 256m 로 고정(Dockerfile 의 MaxRAMPercentage=75% 무력화) ──
+      JAVA_TOOL_OPTIONS: "-Xmx256m -Xms128m"
+      # ── DB (같은 compose 네트워크) ──
+      DB_HOST: mysql
+      DB_PORT: "3306"
+      DB_NAME: ${DB_NAME}
+      DB_USER: root
+      DB_PASSWORD: ${DB_PASSWORD}
+      # ── AI ──
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.5-flash-lite}
+      # ── 사진 영구 보관 ──
+      UPLOAD_DIR: /data/uploads
+      # ── CORS ──
+      CORS_ALLOWED_ORIGINS: https://${APP_DOMAIN}
+      # ── 소셜 로그인(선택) ──
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      KAKAO_CLIENT_ID: ${KAKAO_CLIENT_ID:-}
+      KAKAO_CLIENT_SECRET: ${KAKAO_CLIENT_SECRET:-}
+    volumes:
+      - uploads-data:/data/uploads
+    expose:
+      - "8082"             # 외부 공개 X — caddy 만 접근
+    networks: [internal]
+
+  caddy:
+    image: caddy:2
+    container_name: stp-caddy
+    restart: unless-stopped
+    depends_on: [app]
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    networks: [internal]
+
+networks:
+  internal:
+
+volumes:
+  mysql-data:
+  uploads-data:
+  caddy-data:
+  caddy-config:

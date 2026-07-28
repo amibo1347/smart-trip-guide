@@ -16,6 +16,10 @@ spring:
     log-resolved-exception: false
 
 server:
+  # nginx 뒤에 있으므로 X-Forwarded-Proto/Host 를 신뢰해야 한다.
+  # 이게 없으면 OAuth2 redirect_uri 가 http:// 로 만들어져 구글·카카오가 거부한다(공유 링크도 http 로 나감).
+  forward-headers-strategy: framework
+
   error:
     include-message: never
     include-stacktrace: never
